@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies, normalizeRole } from "@/lib/auth"
+import { getAllowedRoutesForRole } from "@/lib/permissions"
 
 export async function GET() {
   const session = await getSessionFromRequestCookies()
@@ -16,10 +17,12 @@ export async function GET() {
   const role = normalizeRole(user.role)
   if (!role) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
 
+  const allowedRoutes = await getAllowedRoutesForRole(role)
   return NextResponse.json({
     id: user.id,
     name: user.name,
     email: user.email,
     role,
+    allowedRoutes,
   })
 }

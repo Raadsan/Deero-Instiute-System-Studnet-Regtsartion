@@ -13,32 +13,16 @@ function normalizeRole(role: unknown): "ADMIN" | "TEACHER" | "REGISTRAR" | "FINA
   return null
 }
 
-const ADMIN_ONLY = [
-  "/dashboard",
-  "/teachers",
-  "/registrars",
-  "/courses",
-  "/classes",
-  "/partners",
-  "/contracts",
-  "/attendance-management",
-  "/payments",
-  "/audit",
-  "/reports",
-  "/messages",
-  "/certificates",
-  "/finance-users",
-];
-
-const FINANCE_ROUTES = ["/finance", "/staff"];
-
-const STUDENT_ROUTES = ["/students"];
-
-const TEACHER_ONLY = ["/attendance"];
-
 function matchesPathPrefix(pathname: string, base: string) {
   return pathname === base || pathname.startsWith(`${base}/`)
 }
+
+const protectedRouteBases = [
+  "/finance/student-fees", "/finance/teacher-payroll", "/finance/partners", "/finance/expenses",
+  "/finance/audit", "/finance/reports", "/attendance-management", "/finance-users", "/dashboard",
+  "/students", "/teachers", "/registrars", "/courses", "/classes", "/partners", "/contracts",
+  "/attendance", "/payments", "/audit", "/reports", "/messages", "/certificates", "/permissions", "/finance",
+]
 
 export async function middleware(req: NextRequest) {
   const token = req.cookies.get("token")?.value;
@@ -65,33 +49,24 @@ export async function middleware(req: NextRequest) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
-    if (FINANCE_ROUTES.some((path) => matchesPathPrefix(pathname, path))) {
-      if (role !== "ADMIN" && role !== "FINANCE") {
-        return NextResponse.redirect(new URL("/unauthorized", req.url));
-      }
-      return NextResponse.next();
-    }
+    const allowedRoutes = (payload.allowedRoutes as string[]) || [];
+    const matchedRoute = protectedRouteBases.find((route) => matchesPathPrefix(pathname, route));
+    const isAllowed = matchedRoute ? allowedRoutes.includes(matchedRoute) : false;
 
-    if (STUDENT_ROUTES.some((path) => matchesPathPrefix(pathname, path))) {
-      if (role !== "ADMIN" && role !== "REGISTRAR") {
-        return NextResponse.redirect(new URL("/unauthorized", req.url));
+    if (!isAllowed) {
+      // Redirect based on role defaults if they try to access an unauthorized route
+      if (role === "REGISTRAR") {
+        return NextResponse.redirect(new URL("/students", req.url));
       }
-      return NextResponse.next();
-    }
-
-    if (ADMIN_ONLY.some((path) => matchesPathPrefix(pathname, path))) {
-      if (role !== "ADMIN") {
-        if (role === "REGISTRAR") {
-          return NextResponse.redirect(new URL("/students", req.url));
-        }
-        if (role === "FINANCE") {
-          return NextResponse.redirect(new URL("/finance", req.url));
-        }
-        return NextResponse.redirect(new URL("/unauthorized", req.url));
+      if (role === "FINANCE") {
+        return NextResponse.redirect(new URL("/finance", req.url));
       }
-    }
-
-    if (TEACHER_ONLY.some((path) => matchesPathPrefix(pathname, path)) && role !== "TEACHER") {
+      if (role === "TEACHER") {
+        return NextResponse.redirect(new URL("/attendance", req.url));
+      }
+      if (role === "ADMIN") {
+        return NextResponse.redirect(new URL("/dashboard", req.url));
+      }
       return NextResponse.redirect(new URL("/unauthorized", req.url));
     }
 
@@ -135,9 +110,9 @@ export const config = {
     "/certificates/:path*",
     "/finance",
     "/finance/:path*",
-    "/staff",
-    "/staff/:path*",
     "/finance-users",
     "/finance-users/:path*",
+    "/permissions",
+    "/permissions/:path*",
   ],
 };

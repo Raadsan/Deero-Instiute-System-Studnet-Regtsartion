@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///D:/D.Instiutesystem/Deero/instrumentation.ts"],"sourcesContent":["export async function register() {\n  if (process.env.NEXT_RUNTIME === \"nodejs\") {\n    const { startVisitReminderCron } = await import(\"@/lib/visit-reminder-cron\")\n    startVisitReminderCron()\n  }\n}\n"],"names":[],"mappings":";;;;AAAO,eAAe;IACpB,wCAA2C;QACzC,MAAM,EAAE,sBAAsB,EAAE,GAAG;QACnC;IACF;AACF"}}]
+}

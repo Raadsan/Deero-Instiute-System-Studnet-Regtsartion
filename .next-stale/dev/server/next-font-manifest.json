@@ -1,0 +1,39 @@
+{
+  "app": {
+    "[project]/app/(admin)/certificates/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/dashboard/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/permissions/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/registrars/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(staff)/students/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/_not-found/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/login/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

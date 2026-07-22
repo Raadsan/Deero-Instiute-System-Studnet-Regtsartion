@@ -1,0 +1,3 @@
+{
+  "/(admin)/attendance-management/page": "app/(admin)/attendance-management/page.js"
+}

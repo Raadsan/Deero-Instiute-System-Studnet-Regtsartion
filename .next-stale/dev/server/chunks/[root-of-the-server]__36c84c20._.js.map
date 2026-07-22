@@ -1,0 +1,6 @@
+{
+  "version": 3,
+  "sources": [],
+  "sections": [
+    {"offset": {"line": 46, "column": 0}, "map": {"version":3,"sources":["file:///D:/D.Instiutesystem/Deero/app/api/auth/logout/route.ts"],"sourcesContent":["import { NextResponse } from \"next/server\"\n\nexport async function POST() {\n  const res = NextResponse.json({ ok: true })\n  res.cookies.set(\"token\", \"\", {\n    httpOnly: true,\n    sameSite: \"lax\",\n    secure: process.env.NODE_ENV === \"production\",\n    path: \"/\",\n    maxAge: 0,\n    expires: new Date(0),\n  })\n  return res\n}\n"],"names":[],"mappings":";;;;AAAA;;AAEO,eAAe;IACpB,MAAM,MAAM,gJAAY,CAAC,IAAI,CAAC;QAAE,IAAI;IAAK;IACzC,IAAI,OAAO,CAAC,GAAG,CAAC,SAAS,IAAI;QAC3B,UAAU;QACV,UAAU;QACV,QAAQ,oDAAyB;QACjC,MAAM;QACN,QAAQ;QACR,SAAS,IAAI,KAAK;IACpB;IACA,OAAO;AACT"}}]
+}

@@ -1,0 +1,3 @@
+module.exports=[46893,a=>{"use strict";var b=a.i(87924),c=a.i(97895);function d({className:a,...d}){return(0,b.jsx)("textarea",{"data-slot":"textarea",className:(0,c.cn)("border-input placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/50 aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive dark:bg-input/30 flex field-sizing-content min-h-16 w-full rounded-md border bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none focus-visible:ring-[3px] disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",a),...d})}a.s(["Textarea",()=>d])}];
+
+//# sourceMappingURL=components_ui_textarea_tsx_c6802748._.js.map

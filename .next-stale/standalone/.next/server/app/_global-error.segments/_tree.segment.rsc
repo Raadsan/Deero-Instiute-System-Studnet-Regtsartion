@@ -1,0 +1,1 @@
+0:{"buildId":"SlemoO5soe6kUOtJ8EB4d","tree":{"name":"","paramType":null,"paramKey":"","hasRuntimePrefetch":false,"slots":{"children":{"name":"__PAGE__","paramType":null,"paramKey":"__PAGE__","hasRuntimePrefetch":false,"slots":null,"isRootLayout":false}},"isRootLayout":false},"staleTime":300}

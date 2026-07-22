@@ -11,7 +11,5 @@ export default async function TeacherLayout({
 }>) {
   const role = await getRoleFromRequestCookies()
   if (!role) redirect("/login")
-  if (role !== "TEACHER") redirect("/unauthorized")
-
   return <AdminShell role={role}>{children}</AdminShell>
 }

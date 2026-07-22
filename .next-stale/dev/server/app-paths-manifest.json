@@ -1,0 +1,19 @@
+{
+  "/(admin)/certificates/page": "app/(admin)/certificates/page.js",
+  "/(admin)/dashboard/page": "app/(admin)/dashboard/page.js",
+  "/(admin)/permissions/page": "app/(admin)/permissions/page.js",
+  "/(admin)/registrars/page": "app/(admin)/registrars/page.js",
+  "/(staff)/students/page": "app/(staff)/students/page.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/api/auth/login/route": "app/api/auth/login/route.js",
+  "/api/auth/logout/route": "app/api/auth/logout/route.js",
+  "/api/auth/me/route": "app/api/auth/me/route.js",
+  "/api/classes/route": "app/api/classes/route.js",
+  "/api/permissions/route": "app/api/permissions/route.js",
+  "/api/registrars/[id]/route": "app/api/registrars/[id]/route.js",
+  "/api/registrars/route": "app/api/registrars/route.js",
+  "/api/reports/summary/route": "app/api/reports/summary/route.js",
+  "/api/students/route": "app/api/students/route.js",
+  "/login/page": "app/login/page.js",
+  "/page": "app/page.js"
+}

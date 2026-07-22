@@ -1,0 +1,171 @@
+{
+  "sorted_middleware": [],
+  "middleware": {
+    "/": {
+      "files": [
+        "server/edge/chunks/[root-of-the-server]__fbd2c536._.js",
+        "server/edge/chunks/[root-of-the-server]__e72daefd._.js",
+        "server/edge/chunks/turbopack-edge-wrapper_baf45829.js"
+      ],
+      "name": "middleware",
+      "page": "/",
+      "matchers": [
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/dashboard{(\\\\.json)}?",
+          "originalSource": "/dashboard"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/dashboard/:path*{(\\\\.json)}?",
+          "originalSource": "/dashboard/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/students{(\\\\.json)}?",
+          "originalSource": "/students"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/students/:path*{(\\\\.json)}?",
+          "originalSource": "/students/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/teachers{(\\\\.json)}?",
+          "originalSource": "/teachers"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/teachers/:path*{(\\\\.json)}?",
+          "originalSource": "/teachers/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/registrars{(\\\\.json)}?",
+          "originalSource": "/registrars"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/registrars/:path*{(\\\\.json)}?",
+          "originalSource": "/registrars/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/courses{(\\\\.json)}?",
+          "originalSource": "/courses"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/courses/:path*{(\\\\.json)}?",
+          "originalSource": "/courses/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/classes{(\\\\.json)}?",
+          "originalSource": "/classes"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/classes/:path*{(\\\\.json)}?",
+          "originalSource": "/classes/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/partners{(\\\\.json)}?",
+          "originalSource": "/partners"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/partners/:path*{(\\\\.json)}?",
+          "originalSource": "/partners/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/contracts{(\\\\.json)}?",
+          "originalSource": "/contracts"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/contracts/:path*{(\\\\.json)}?",
+          "originalSource": "/contracts/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/attendance{(\\\\.json)}?",
+          "originalSource": "/attendance"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/attendance/:path*{(\\\\.json)}?",
+          "originalSource": "/attendance/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/attendance-management{(\\\\.json)}?",
+          "originalSource": "/attendance-management"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/attendance-management/:path*{(\\\\.json)}?",
+          "originalSource": "/attendance-management/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/payments{(\\\\.json)}?",
+          "originalSource": "/payments"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/payments/:path*{(\\\\.json)}?",
+          "originalSource": "/payments/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/audit{(\\\\.json)}?",
+          "originalSource": "/audit"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/audit/:path*{(\\\\.json)}?",
+          "originalSource": "/audit/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/reports{(\\\\.json)}?",
+          "originalSource": "/reports"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/reports/:path*{(\\\\.json)}?",
+          "originalSource": "/reports/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/messages{(\\\\.json)}?",
+          "originalSource": "/messages"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/messages/:path*{(\\\\.json)}?",
+          "originalSource": "/messages/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/certificates{(\\\\.json)}?",
+          "originalSource": "/certificates"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/certificates/:path*{(\\\\.json)}?",
+          "originalSource": "/certificates/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/finance{(\\\\.json)}?",
+          "originalSource": "/finance"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/finance/:path*{(\\\\.json)}?",
+          "originalSource": "/finance/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/finance-users{(\\\\.json)}?",
+          "originalSource": "/finance-users"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/finance-users/:path*{(\\\\.json)}?",
+          "originalSource": "/finance-users/:path*"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/permissions{(\\\\.json)}?",
+          "originalSource": "/permissions"
+        },
+        {
+          "regexp": "/:nextData(_next/data/[^/]{1,})?/permissions/:path*{(\\\\.json)}?",
+          "originalSource": "/permissions/:path*"
+        }
+      ],
+      "wasm": [],
+      "assets": [],
+      "env": {
+        "__NEXT_BUILD_ID": "SlemoO5soe6kUOtJ8EB4d",
+        "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "PgrieNyvnOxR3kfY/L4uAuz3gGXpPFpHd+myYZq2RxI=",
+        "__NEXT_PREVIEW_MODE_ID": "2394ff90f5175434f2903039eb53f769",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "7a4a746d02b85bf2b105dd91d4f67dd282d99a5d9b8d2bd188109c792ed5c088",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "bad8369d3b01c1d8017397d9ddba87a6caaae915ca099d5b3290b9544d24f38c"
+      }
+    }
+  },
+  "instrumentation": null,
+  "functions": {}
+}

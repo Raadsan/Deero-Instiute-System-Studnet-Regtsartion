@@ -433,3 +433,16 @@ model FinanceEntry {
   @@index([occurredAt])
   @@index([recordedById])
 }
+
+model RolePermission {
+  id        String   @id @default(cuid())
+  role      Role
+  route     String
+  allowed   Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([role, route])
+  @@index([role, allowed])
+}

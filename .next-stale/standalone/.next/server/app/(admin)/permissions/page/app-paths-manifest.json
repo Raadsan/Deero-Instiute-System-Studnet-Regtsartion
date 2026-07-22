@@ -1,0 +1,3 @@
+{
+  "/(admin)/permissions/page": "app/(admin)/permissions/page.js"
+}

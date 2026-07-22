@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
 import { sendHormuudSms } from "@/lib/sms-hormuud"
+import { hasRoutePermission } from "@/lib/permissions"
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getSessionFromRequestCookies()
     if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
-    if (session.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+    if (!(await hasRoutePermission(session.role, "/messages"))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+    }
 
     const body: unknown = await req.json()
     if (!body || typeof body !== "object") return NextResponse.json({ message: "Invalid body" }, { status: 400 })
@@ -44,15 +47,19 @@ export async function POST(req: NextRequest) {
       select: { phone: true, firstName: true },
     })
 
-    const results = await Promise.all(
-      students.map(async (s) => {
+    const results: Array<{ ok: boolean; status: "SENT" | "SKIPPED" | "FAILED"; error?: string }> = []
+    const batchSize = 5
+    for (let index = 0; index < students.length; index += batchSize) {
+      const batch = students.slice(index, index + batchSize)
+      const batchResults = await Promise.all(batch.map(async (s) => {
         if (!s.phone) return { ok: true as const, status: "SKIPPED" as const }
         const personalMessage = message.trim().replace(/\[\[name\]\]/g, s.firstName || "Student")
         const result = await sendHormuudSms(s.phone, personalMessage)
         if (result.ok) return { ok: true as const, status: "SENT" as const }
         return { ok: false as const, status: "FAILED" as const, error: result.error }
-      }),
-    )
+      }))
+      results.push(...batchResults)
+    }
 
     const sent = results.filter((r) => r.ok && r.status === "SENT").length
     const skipped = results.filter((r) => r.ok && r.status === "SKIPPED").length

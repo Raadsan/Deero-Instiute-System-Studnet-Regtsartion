@@ -21,6 +21,7 @@ import {
   Briefcase,
   ClipboardList,
   X,
+  Shield,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import type { AppRole } from "@/lib/auth"
@@ -35,7 +36,7 @@ interface SidebarProps {
   onClose?: () => void
 }
 
-const adminMenuItems = [
+const allMenuItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/students", label: "Students", icon: Users },
   { href: "/registrars", label: "Registration Users", icon: UserPlus },
@@ -43,29 +44,21 @@ const adminMenuItems = [
   { href: "/courses", label: "Courses", icon: BookOpen },
   { href: "/classes", label: "Classes", icon: School },
   { href: "/partners", label: "Partners", icon: Handshake },
+  { href: "/attendance-management", label: "Attendance", icon: Calendar },
   { href: "/contracts", label: "Contracts", icon: ScrollText },
   { href: "/finance", label: "Finance", icon: Wallet },
-  { href: "/staff", label: "Staff", icon: Briefcase },
   { href: "/finance-users", label: "Finance Users", icon: UserPlus },
-  { href: "/attendance-management", label: "Attendance", icon: Calendar },
   { href: "/payments", label: "Payments", icon: DollarSign },
-  { href: "/audit", label: "Audit Log", icon: ClipboardList },
   { href: "/reports", label: "Reports", icon: FileText },
   { href: "/messages", label: "Messages", icon: Mail },
-]
-
-const financeMenuItems = [
-  { href: "/finance", label: "Finance Dashboard", icon: Wallet },
   { href: "/finance/student-fees", label: "Student Fees", icon: DollarSign },
   { href: "/finance/teacher-payroll", label: "Teacher Payroll", icon: ScrollText },
   { href: "/finance/partners", label: "Partner Payouts", icon: Handshake },
-  { href: "/staff", label: "Staff Salaries", icon: Briefcase },
-  { href: "/finance/expenses", label: "Income & Expenses", icon: FileText },
-  { href: "/finance/audit", label: "Audit Log", icon: ClipboardList },
   { href: "/finance/reports", label: "Financial Reports", icon: FileText },
+  { href: "/finance/expenses", label: "Income & Expenses", icon: FileText },
+  { href: "/permissions", label: "Role Permissions", icon: Shield },
+  { href: "/audit", label: "Audit Log", icon: ClipboardList },
 ]
-
-const registrarMenuItems = [{ href: "/students", label: "Register Students", icon: Users }]
 
 function normalizeClientRole(role: unknown): AppRole | null {
   if (role === "Register") return "REGISTRAR"
@@ -83,6 +76,7 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname()
   const [role, setRole] = useState<AppRole | null>(roleProp ?? null)
+  const [allowedRoutes, setAllowedRoutes] = useState<string[] | null>(null)
 
   useEffect(() => {
     setRole(roleProp ?? null)
@@ -91,25 +85,21 @@ export default function Sidebar({
   useEffect(() => {
     void (async () => {
       try {
-        const res = await api.get<{ role: AppRole }>("/api/auth/me")
+        const res = await api.get<{ role: AppRole; allowedRoutes: string[] }>("/api/auth/me")
         const resolved = normalizeClientRole(res.data.role)
         if (resolved) setRole(resolved)
+        if (res.data.allowedRoutes) setAllowedRoutes(res.data.allowedRoutes)
       } catch {
         // keep server-provided role
       }
     })()
   }, [])
 
-  const menuItems =
-    role === "ADMIN"
-      ? adminMenuItems
-      : role === "FINANCE"
-        ? financeMenuItems
-      : role === "REGISTRAR"
-        ? registrarMenuItems
-        : role === "TEACHER"
-          ? [{ href: "/attendance", label: "Attendance", icon: Calendar }]
-          : []
+  const menuItems = allowedRoutes
+    ? allMenuItems.filter((item) => allowedRoutes.includes(item.href))
+    : role === "ADMIN"
+      ? allMenuItems
+      : []
 
   return (
     <aside

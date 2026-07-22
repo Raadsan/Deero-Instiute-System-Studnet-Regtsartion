@@ -11,7 +11,5 @@ export default async function StaffLayout({
 }>) {
   const role = await getRoleFromRequestCookies()
   if (!role) redirect("/login")
-  if (role !== "ADMIN" && role !== "REGISTRAR") redirect("/unauthorized")
-
   return <AdminShell role={role}>{children}</AdminShell>
 }

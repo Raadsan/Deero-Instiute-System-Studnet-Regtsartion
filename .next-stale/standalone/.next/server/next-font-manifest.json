@@ -1,0 +1,127 @@
+{
+  "app": {
+    "[project]/app/(admin)/attendance-management/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/audit/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/certificates/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/classes/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/contracts/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/courses/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/dashboard/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/finance-users/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/messages/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/partners/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/payments/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/permissions/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/registrars/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/reports/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(admin)/teachers/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(finance)/finance/audit/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(finance)/finance/expenses/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(finance)/finance/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(finance)/finance/partners/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(finance)/finance/reports/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(finance)/finance/student-fees/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(finance)/finance/teacher-payroll/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(staff)/students/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/(teacher)/attendance/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/_not-found/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/forgot-password/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/login/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/reset-password/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ],
+    "[project]/app/unauthorized/page": [
+      "static/media/caa3a2e1cccd8315-s.p.3b6cae6d.woff2",
+      "static/media/797e433ab948586e-s.p.29207c2f.woff2"
+    ]
+  },
+  "appUsingSizeAdjust": true,
+  "pages": {},
+  "pagesUsingSizeAdjust": false
+}

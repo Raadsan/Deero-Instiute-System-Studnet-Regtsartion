@@ -4,6 +4,7 @@ import { SignJWT } from "jose";
 import { prisma } from "@/lib/prisma";
 import { normalizeLoginEmail } from "@/lib/password-utils";
 import { normalizeRole } from "@/lib/auth";
+import { getAllowedRoutesForRole } from "@/lib/permissions";
 
 export async function POST(req: Request) {
   const jwtSecret = process.env.JWT_SECRET
@@ -50,7 +51,8 @@ export async function POST(req: Request) {
   const ok = await bcrypt.compare(String(password), user.password);
   if (!ok) return NextResponse.json({ message: "Invalid credentials" }, { status: 401 });
 
-  const token = await new SignJWT({ sub: user.id, role })
+  const allowedRoutes = await getAllowedRoutesForRole(role);
+  const token = await new SignJWT({ sub: user.id, role, allowedRoutes })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("7d")

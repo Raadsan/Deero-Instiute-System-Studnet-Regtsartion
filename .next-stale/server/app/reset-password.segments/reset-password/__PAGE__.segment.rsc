@@ -1,0 +1,6 @@
+1:"$Sreact.fragment"
+2:"$Sreact.suspense"
+3:I[36984,["/_next/static/chunks/ec06f3d9ba4d9fcf.js","/_next/static/chunks/81a7f6fc7118a8bd.js","/_next/static/chunks/e786e6c61d6c5272.js","/_next/static/chunks/ee9257f41e87a204.js"],"default"]
+4:I[97367,["/_next/static/chunks/ff1a16fafef87110.js","/_next/static/chunks/1a476e30dee46234.js"],"OutletBoundary"]
+0:{"buildId":"SlemoO5soe6kUOtJ8EB4d","rsc":["$","$1","c",{"children":[["$","$2",null,{"fallback":["$","div",null,{"className":"min-h-screen flex items-center justify-center","children":["$","svg",null,{"xmlns":"http://www.w3.org/2000/svg","width":24,"height":24,"viewBox":"0 0 24 24","fill":"none","stroke":"currentColor","strokeWidth":2,"strokeLinecap":"round","strokeLinejoin":"round","className":"lucide lucide-loader-circle size-4 animate-spin h-8 w-8","role":"status","aria-label":"Loading","children":[["$","path","13zald",{"d":"M21 12a9 9 0 1 1-6.219-8.56"}],"$undefined"]}]}],"children":["$","$L3",null,{}]}],[["$","script","script-0",{"src":"/_next/static/chunks/e786e6c61d6c5272.js","async":true}],["$","script","script-1",{"src":"/_next/static/chunks/ee9257f41e87a204.js","async":true}]],["$","$L4",null,{"children":["$","$2",null,{"name":"Next.MetadataOutlet","children":"$@5"}]}]]}],"loading":null,"isPartial":false}
+5:null

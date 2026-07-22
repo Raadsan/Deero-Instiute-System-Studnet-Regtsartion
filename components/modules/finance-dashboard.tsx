@@ -38,14 +38,12 @@ type FinanceSummary = {
   studentFees: { totalCollected: number; monthlyCollected: number; unpaidStudents: number }
   partners: { monthlyDue: number; balanceDue: number; totalPaidOut: number; count: number }
   teacherPayroll: { monthlyPay: number; balanceDue: number; totalPaidOut: number; teachersCount: number }
-  staffPayroll: { monthlyPayroll: number; balanceDue: number; totalPaidOut: number; staffCount: number }
 }
 
 const quickLinks = [
   { href: "/finance/student-fees", label: "Student Fees", icon: GraduationCap },
   { href: "/finance/teacher-payroll", label: "Teacher Payroll", icon: Users },
   { href: "/finance/partners", label: "Partner Payouts", icon: Handshake },
-  { href: "/staff", label: "Staff Salaries", icon: Briefcase },
   { href: "/finance/expenses", label: "Income & Expenses", icon: TrendingDown },
   { href: "/finance/reports", label: "Financial Reports", icon: DollarSign },
 ]
@@ -185,8 +183,6 @@ export default function FinanceDashboard() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span>Teacher payroll due</span><span className="font-medium">{formatMoney(summary.teacherPayroll.monthlyPay)}</span></div>
             <div className="flex justify-between"><span>Teacher balance outstanding</span><span className="font-medium">{formatMoney(summary.teacherPayroll.balanceDue)}</span></div>
-            <div className="flex justify-between"><span>Staff payroll due</span><span className="font-medium">{formatMoney(summary.staffPayroll.monthlyPayroll)}</span></div>
-            <div className="flex justify-between"><span>Staff balance outstanding</span><span className="font-medium">{formatMoney(summary.staffPayroll.balanceDue)}</span></div>
             <div className="flex justify-between"><span>Partner monthly due</span><span className="font-medium">{formatMoney(summary.partners.monthlyDue)}</span></div>
             <div className="flex justify-between border-t pt-2"><span>Partner balance outstanding</span><span className="font-semibold">{formatMoney(summary.partners.balanceDue)}</span></div>
           </div>

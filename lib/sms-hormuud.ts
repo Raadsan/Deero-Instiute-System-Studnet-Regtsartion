@@ -7,10 +7,14 @@ type TokenCache = { token: string; expiresAt: number }
 let cachedToken: TokenCache | null = null
 
 function requireEnv(name: string) {
-  const value = process.env[name]
+  const value = process.env[name]?.trim()
   if (!value) throw new Error(`${name} is not set`)
   return value
 }
+
+const HORMUUD_TOKEN_URL = "https://smsapi.hormuud.com/token"
+const HORMUUD_SEND_URL = "https://smsapi.hormuud.com/api/SendSMS"
+const REQUEST_TIMEOUT_MS = 20_000
 
 /** Normalize to Hormuud format e.g. 619054660 */
 export function normalizeSmsMobile(phone: string): string | null {
@@ -42,15 +46,26 @@ async function getHormuudToken(): Promise<string> {
     password,
   })
 
-  const res = await fetch("https://smsapi.hormuud.com/token", {
+  const res = await fetch(HORMUUD_TOKEN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: body.toString(),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   })
 
   const text = await res.text()
   if (!res.ok) {
-    throw new Error(`Failed to get Hormuud token: ${text || res.statusText}`)
+    let providerMessage = ""
+    try {
+      const errorBody = JSON.parse(text) as { error?: string; error_description?: string }
+      if (errorBody.error === "invalid_grant") {
+        throw new Error("Hormuud rejected the API username or API password. Copy fresh API credentials from your Hormuud Business profile.")
+      }
+      providerMessage = errorBody.error_description ?? errorBody.error ?? ""
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith("Hormuud rejected")) throw error
+    }
+    throw new Error(`Hormuud authentication failed${providerMessage ? `: ${providerMessage}` : ` (${res.status})`}`)
   }
 
   let json: { access_token?: string; expires_in?: number }
@@ -87,7 +102,8 @@ function isHormuudSuccess(json: Record<string, unknown>): boolean {
 
 export async function sendHormuudSms(mobile: string, message: string): Promise<HormuudSendResult> {
   const normalized = normalizeSmsMobile(mobile)
-  if (!normalized) return { ok: false, error: "Invalid phone number" }
+  if (!normalized) return { ok: false, error: "Invalid phone number. Use 61xxxxxxx or +25261xxxxxxx." }
+  if (!message.trim()) return { ok: false, error: "SMS message is empty" }
 
   let token: string
   try {
@@ -101,17 +117,23 @@ export async function sendHormuudSms(mobile: string, message: string): Promise<H
     message,
   }
 
-  const senderId = process.env.SMS_HORMUUD_SENDER_ID?.trim()
-  if (senderId) payload.senderid = senderId
+  let senderId: string
+  try {
+    senderId = requireEnv("SMS_HORMUUD_SENDER_ID")
+  } catch (e: unknown) {
+    return { ok: false, error: e instanceof Error ? e.message : "Hormuud sender ID is not configured" }
+  }
+  payload.senderid = senderId
 
   try {
-    const res = await fetch("https://smsapi.hormuud.com/api/SendSMS", {
+    const res = await fetch(HORMUUD_SEND_URL, {
       method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
 
     const text = await res.text()
@@ -142,9 +164,10 @@ export async function sendHormuudSms(mobile: string, message: string): Promise<H
     return {
       ok: false,
       error,
-      responseCode: typeof json.ResponseCode === "string" ? json.ResponseCode : undefined,
+      responseCode: json.ResponseCode == null ? undefined : String(json.ResponseCode),
     }
   } catch (e: unknown) {
-    return { ok: false, error: e instanceof Error ? e.message : "Network error" }
+    const message = e instanceof Error ? e.message : "Network error"
+    return { ok: false, error: message.includes("timeout") ? "Hormuud SMS request timed out" : message }
   }
 }

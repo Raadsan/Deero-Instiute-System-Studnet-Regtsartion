@@ -1,6 +1,6 @@
-# Sodamasystem
+# Deerosystem
 
-Sodma — Student Registration System built with Next.js, PostgreSQL, and Prisma.
+Deero — Student Registration System built with Next.js, PostgreSQL, and Prisma.
 
 ## Features
 

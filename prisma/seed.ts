@@ -83,6 +83,44 @@ async function main() {
     },
   })
 
+  // Seed default permissions for other roles
+  const defaultPermissions = [
+    // REGISTRAR
+    { role: "REGISTRAR", route: "/students", allowed: true },
+    
+    // TEACHER
+    { role: "TEACHER", route: "/attendance", allowed: true },
+
+    // FINANCE
+    { role: "FINANCE", route: "/finance", allowed: true },
+    { role: "FINANCE", route: "/finance/student-fees", allowed: true },
+    { role: "FINANCE", route: "/finance/teacher-payroll", allowed: true },
+    { role: "FINANCE", route: "/finance/partners", allowed: true },
+    { role: "FINANCE", route: "/finance/expenses", allowed: true },
+    { role: "FINANCE", route: "/finance/audit", allowed: true },
+    { role: "FINANCE", route: "/finance/reports", allowed: true },
+    { role: "FINANCE", route: "/payments", allowed: true },
+  ]
+
+  for (const perm of defaultPermissions) {
+    await prisma.rolePermission.upsert({
+      where: {
+        role_route: {
+          role: perm.role as any,
+          route: perm.route,
+        },
+      },
+      update: {
+        allowed: perm.allowed,
+      },
+      create: {
+        role: perm.role as any,
+        route: perm.route,
+        allowed: perm.allowed,
+      },
+    })
+  }
+
   console.log("Seed completed")
 }
 

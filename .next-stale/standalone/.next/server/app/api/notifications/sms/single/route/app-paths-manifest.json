@@ -1,0 +1,3 @@
+{
+  "/api/notifications/sms/single/route": "app/api/notifications/sms/single/route.js"
+}

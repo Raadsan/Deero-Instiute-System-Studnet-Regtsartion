@@ -16,10 +16,10 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: "/images/deero.png",
+        url: "/images/fv-01.jpg",
       },
     ],
-    apple: "/images/fv-01",
+    apple: "/images/fv-01.jpg",
   },
 }
 

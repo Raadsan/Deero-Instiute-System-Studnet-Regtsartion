@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
 import { isPasswordValid } from "@/lib/password-utils"
+import { hasRoutePermission } from "@/lib/permissions"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -10,7 +11,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   const { id } = await params
   const session = await getSessionFromRequestCookies()
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
-  if (session.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+  if (!(await hasRoutePermission(session.role, "/teachers"))) return NextResponse.json({ message: "Forbidden" }, { status: 403 })
 
   const body: unknown = await req.json()
   if (!body || typeof body !== "object") return NextResponse.json({ message: "Invalid body" }, { status: 400 })
@@ -84,7 +85,7 @@ export async function DELETE(_: NextRequest, { params }: RouteContext) {
   const { id } = await params
   const session = await getSessionFromRequestCookies()
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
-  if (session.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+  if (!(await hasRoutePermission(session.role, "/teachers"))) return NextResponse.json({ message: "Forbidden" }, { status: 403 })
 
   const teacher = await prisma.user.findFirst({
     where: { id, role: "TEACHER" },

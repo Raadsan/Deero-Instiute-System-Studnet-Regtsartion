@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
 import { sendHormuudSms } from "@/lib/sms-hormuud"
+import { hasRoutePermission } from "@/lib/permissions"
 
 export async function POST(req: NextRequest) {
   try {
     const session = await getSessionFromRequestCookies()
     if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
-    if (session.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+    if (!(await hasRoutePermission(session.role, "/messages"))) {
+      return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+    }
 
     const body: unknown = await req.json()
     if (!body || typeof body !== "object") return NextResponse.json({ message: "Invalid body" }, { status: 400 })

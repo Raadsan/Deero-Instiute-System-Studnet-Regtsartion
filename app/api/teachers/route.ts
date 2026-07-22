@@ -5,19 +5,19 @@ import { getSessionFromRequestCookies } from "@/lib/auth";
 import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { buildTeacherSearchFilter } from "@/lib/student-search";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { hasRoutePermission } from "@/lib/permissions";
 
 // GET /api/teachers (ADMIN, FINANCE read)
 export async function GET(req: Request) {
   const session = await getSessionFromRequestCookies();
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  if (session.role !== "ADMIN" && session.role !== "FINANCE") {
+  if (!(await hasRoutePermission(session.role, "/teachers"))) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
   const { searchParams } = new URL(req.url);
   const includeInactive = searchParams.get("includeInactive") === "true";
   const search = searchParams.get("search")?.trim() ?? "";
-  const { page, pageSize, skip } = parsePagination(searchParams);
 
   const baseWhere: Prisma.UserWhereInput = {
     role: "TEACHER",
@@ -25,6 +25,45 @@ export async function GET(req: Request) {
   };
   const searchFilter = buildTeacherSearchFilter(search);
   const where: Prisma.UserWhereInput = searchFilter ? { AND: [baseWhere, searchFilter] } : baseWhere;
+
+  const isPaginated = searchParams.has("page");
+
+  if (!isPaginated) {
+    const teachers = await prisma.user.findMany({
+      where,
+      select: { id: true, name: true, email: true, isActive: true },
+      orderBy: { name: "asc" },
+    });
+
+    const teacherIds = teachers.map((t) => t.id);
+    const classRows = teacherIds.length
+      ? await prisma.class.findMany({
+          where: { teacherId: { in: teacherIds } },
+          select: { id: true, name: true, level: true, teacherId: true },
+        })
+      : [];
+
+    const classesByTeacher = new Map<string, Array<{ id: string; name: string; level: string | null }>>();
+    for (const cls of classRows) {
+      const tid = cls.teacherId;
+      if (!tid) continue;
+      const list = classesByTeacher.get(tid) ?? [];
+      list.push({ id: cls.id, name: cls.name, level: cls.level ?? null });
+      classesByTeacher.set(tid, list);
+    }
+
+    return NextResponse.json(
+      teachers.map((t) => ({
+        id: t.id,
+        name: t.name,
+        email: t.email,
+        isActive: Boolean(t.isActive),
+        classes: classesByTeacher.get(t.id) ?? [],
+      }))
+    );
+  }
+
+  const { page, pageSize, skip } = parsePagination(searchParams);
 
   const [total, teachers] = await Promise.all([
     prisma.user.count({ where }),
@@ -70,7 +109,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   const session = await getSessionFromRequestCookies();
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
-  if (session.role !== "ADMIN") return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  if (!(await hasRoutePermission(session.role, "/teachers"))) return NextResponse.json({ message: "Forbidden" }, { status: 403 });
 
   const body: unknown = await req.json();
   if (!body || typeof body !== "object") return NextResponse.json({ message: "Invalid body" }, { status: 400 });
