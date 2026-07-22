@@ -220,8 +220,8 @@ export default function PaymentsView() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#2060AC]/10 via-background to-[#FCBE1A]/5 p-6 sm:p-8">
-        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#2060AC]/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
+        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#003D9E]/10 blur-3xl" />
         <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -305,9 +305,9 @@ export default function PaymentsView() {
         <>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <Card className="relative overflow-hidden p-5 border-muted/50 shadow-sm">
-              <div className="absolute inset-x-0 top-0 h-1 bg-[#2060AC]" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-[#003D9E]" />
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Collected</p>
-              <p className="text-2xl sm:text-3xl font-bold text-[#2060AC] tabular-nums mt-1">
+              <p className="text-2xl sm:text-3xl font-bold text-[#003D9E] tabular-nums mt-1">
                 {formatCurrency(totals?.totalCollected ?? 0)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">All recorded payments</p>
@@ -327,9 +327,9 @@ export default function PaymentsView() {
               <p className="text-xs text-muted-foreground mt-1">Out of {totals?.totalStudents ?? 0} students</p>
             </Card>
             <Card className="relative overflow-hidden p-5 border-muted/50 shadow-sm">
-              <div className="absolute inset-x-0 top-0 h-1 bg-[#FCBE1A]" />
+              <div className="absolute inset-x-0 top-0 h-1 bg-[#EC4724]" />
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unpaid Students</p>
-              <p className="text-2xl sm:text-3xl font-bold text-[#FCBE1A] tabular-nums mt-1">{totals?.unpaidStudents ?? 0}</p>
+              <p className="text-2xl sm:text-3xl font-bold text-[#EC4724] tabular-nums mt-1">{totals?.unpaidStudents ?? 0}</p>
               <p className="text-xs text-muted-foreground mt-1">Still need to pay</p>
             </Card>
           </div>
@@ -369,7 +369,7 @@ export default function PaymentsView() {
                         <TableCell className="py-4 text-emerald-700 font-medium">{row.paidStudents}</TableCell>
                         <TableCell className="py-4 text-amber-700 font-medium">{row.unpaidStudents}</TableCell>
                         <TableCell className="py-4">{row.paymentCount}</TableCell>
-                        <TableCell className="py-4 pr-6 text-right font-bold tabular-nums text-[#2060AC]">
+                        <TableCell className="py-4 pr-6 text-right font-bold tabular-nums text-[#003D9E]">
                           {formatCurrency(row.totalCollected)}
                         </TableCell>
                       </TableRow>

@@ -42,7 +42,7 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md">
         <Card className="p-8 border border-slate-200/80 bg-white shadow-md">
           <div className="mb-6 flex justify-center">
-            <img src="/images/sodma.png" alt="Sodma Logo" className="h-14 w-auto object-contain" />
+            <img src="/images/logo dero isntiute-01.png" alt="Deero Institute Logo" className="h-14 w-auto object-contain" />
           </div>
 
           <div className="mb-6 space-y-1.5 text-center">

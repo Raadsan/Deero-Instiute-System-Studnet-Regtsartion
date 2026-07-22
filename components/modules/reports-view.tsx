@@ -236,7 +236,7 @@ function MoneyTile({ label, value, tone = "default" }: { label: string; value: s
       : tone === "expense"
         ? "border-rose-200 bg-rose-50 text-rose-800"
         : tone === "accent"
-          ? "border-[#2060AC]/20 bg-gradient-to-br from-[#2060AC]/10 to-transparent text-[#2060AC]"
+          ? "border-[#003D9E]/20 bg-gradient-to-br from-[#003D9E]/10 to-transparent text-[#003D9E]"
           : "border-muted bg-muted/20 text-foreground"
 
   return (
@@ -327,9 +327,9 @@ export default function ReportsView() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#2060AC]/10 via-background to-[#FCBE1A]/5 p-6 sm:p-8">
-        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#2060AC]/10 blur-3xl" />
-        <div className="absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#FCBE1A]/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
+        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#003D9E]/10 blur-3xl" />
+        <div className="absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#EC4724]/10 blur-3xl" />
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -430,8 +430,8 @@ export default function ReportsView() {
               value={report.overview.totalStudents.toLocaleString()}
               hint={`${report.overview.enrolledStudents} enrolled · ${report.overview.visitScheduledStudents} visit scheduled`}
               icon={Users}
-              accent="from-[#2060AC]/15 to-[#2060AC]/5"
-              iconBg="bg-[#2060AC]"
+              accent="from-[#003D9E]/15 to-[#003D9E]/5"
+              iconBg="bg-[#003D9E]"
             />
             <MetricCard
               label="Unpaid Students"
@@ -446,8 +446,8 @@ export default function ReportsView() {
               value={`${report.overview.totalTeachers} / ${report.overview.totalClasses}`}
               hint="Active teachers and classes"
               icon={GraduationCap}
-              accent="from-[#FCBE1A]/15 to-[#FCBE1A]/5"
-              iconBg="bg-[#FCBE1A]"
+              accent="from-[#EC4724]/15 to-[#EC4724]/5"
+              iconBg="bg-[#EC4724]"
             />
             <MetricCard
               label="Attendance Rate"

@@ -170,8 +170,8 @@ export default function TeacherAttendance() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
-      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#2060AC]/10 via-background to-[#FCBE1A]/5 p-6 sm:p-8">
-        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#2060AC]/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
+        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#003D9E]/10 blur-3xl" />
         <div className="relative space-y-2">
           <Badge variant="secondary" className="rounded-full bg-background/80 border-primary/20 text-primary font-medium">
             Teacher Dashboard
@@ -188,9 +188,9 @@ export default function TeacherAttendance() {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">My Classes</p>
-              <p className="text-2xl font-bold text-[#2060AC] mt-1">{overview.classCount}</p>
+              <p className="text-2xl font-bold text-[#003D9E] mt-1">{overview.classCount}</p>
             </div>
-            <div className="p-2.5 rounded-xl bg-[#2060AC]/10 text-[#2060AC]">
+            <div className="p-2.5 rounded-xl bg-[#003D9E]/10 text-[#003D9E]">
               <GraduationCap className="w-5 h-5" />
             </div>
           </div>

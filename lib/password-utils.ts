@@ -1,9 +1,8 @@
-/** Accept common shorthand emails at login (e.g. admin@sodma → stored admin@sodma). */
 export function normalizeLoginEmail(email: string): string {
   const normalized = email.trim().toLowerCase()
-  if (normalized === "admin@sodma.com") return "admin@sodma"
-  if (normalized === "admission@sodma.com") return "admission@sodma"
-  if (normalized === "finance@sodma.com") return "finance@sodma"
+  if (normalized === "admin@deeroinstitute.com" || normalized === "admin@sodma.com" || normalized === "admin@sodma") return "admin@deeroinstitute"
+  if (normalized === "admission@deeroinstitute.com" || normalized === "admission@sodma.com" || normalized === "admission@sodma") return "admission@deeroinstitute"
+  if (normalized === "finance@deeroinstitute.com" || normalized === "finance@sodma.com" || normalized === "finance@sodma") return "finance@deeroinstitute"
   return normalized
 }
 

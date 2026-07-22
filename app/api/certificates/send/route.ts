@@ -41,7 +41,7 @@ const DEFAULT_NAME_CONFIG: NameConfig = {
   x: 50,
   y: 50,
   size: 40,
-  color: "#ea580c",
+  color: "#EC4724",
   fontFamily: "serif",
   fontWeight: "bold",
   align: "center",

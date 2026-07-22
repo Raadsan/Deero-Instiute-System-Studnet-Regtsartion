@@ -541,8 +541,8 @@ export default function StudentsList() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#2060AC]/10 via-background to-[#FCBE1A]/5 p-6 sm:p-8">
-        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#2060AC]/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
+        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#003D9E]/10 blur-3xl" />
         <div className="relative flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-background/80 border border-primary/15 px-3 py-1 text-xs font-medium text-primary">
@@ -733,7 +733,7 @@ export default function StudentsList() {
                       </TableCell>
                     )}
                     {isAdmin && (
-                      <TableCell className="hidden lg:table-cell py-4 align-middle font-semibold tabular-nums text-[#2060AC]">
+                      <TableCell className="hidden lg:table-cell py-4 align-middle font-semibold tabular-nums text-[#003D9E]">
                         {formatCurrency(student.totalPaid ?? 0)}
                       </TableCell>
                     )}
@@ -766,7 +766,7 @@ export default function StudentsList() {
                         variant="secondary"
                         className={`inline-flex min-w-[88px] justify-center rounded-full shadow-none px-3 py-1 text-xs font-semibold transition ${
                           student.isActive
-                            ? "bg-[#2060AC]/10 text-[#2060AC] hover:bg-[#2060AC]/15 border border-[#2060AC]/20"
+                            ? "bg-[#003D9E]/10 text-[#003D9E] hover:bg-[#003D9E]/15 border border-[#003D9E]/20"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
                         } ${statusUpdating[student.id] ? "opacity-60 cursor-wait" : "cursor-pointer"}`}
                       >
@@ -865,16 +865,16 @@ export default function StudentsList() {
                   onClick={() => setEnrollmentStatus("ENROLLED")}
                   className={`flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
                     enrollmentStatus === "ENROLLED"
-                      ? "border-[#2060AC] bg-[#2060AC]/5"
+                      ? "border-[#003D9E] bg-[#003D9E]/5"
                       : "border-muted hover:bg-muted/30"
                   }`}
                 >
-                  <div className={`p-2 rounded-lg ${enrollmentStatus === "ENROLLED" ? "bg-[#2060AC] text-white" : "bg-muted text-muted-foreground"}`}>
+                  <div className={`p-2 rounded-lg ${enrollmentStatus === "ENROLLED" ? "bg-[#003D9E] text-white" : "bg-muted text-muted-foreground"}`}>
                     <GraduationCap className="w-4 h-4" />
                   </div>
                   <div>
                     <p className="font-semibold text-sm">Enrolled Student</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Fully registered at Sodma</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Fully registered at Deero Institute</p>
                   </div>
                 </button>
                 <button
@@ -962,7 +962,7 @@ export default function StudentsList() {
                     id="visitNote"
                     value={visitNote}
                     onChange={(e) => setVisitNote(e.target.value)}
-                    placeholder='e.g. "Does not know Sodma yet, will visit Saturday"'
+                    placeholder='e.g. "Does not know Deero Institute yet, will visit Saturday"'
                     className="bg-background"
                   />
                 </div>
@@ -1042,7 +1042,7 @@ export default function StudentsList() {
                 </div>
                 {editing && (editing.totalPaid ?? 0) > 0 && (
                   <p className="text-sm text-muted-foreground">
-                    Total paid so far: <span className="font-semibold text-[#2060AC]">{formatCurrency(editing.totalPaid ?? 0)}</span>
+                    Total paid so far: <span className="font-semibold text-[#003D9E]">{formatCurrency(editing.totalPaid ?? 0)}</span>
                   </p>
                 )}
               </div>

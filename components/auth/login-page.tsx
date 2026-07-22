@@ -39,7 +39,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
         description:
           status === 503
             ? message ?? "Database not connected. Run: npx prisma migrate deploy && npx prisma db seed"
-            : message ?? "Check email and password. Admin: admin@sodma",
+            : message ?? "Check email and password. Admin: admin@deeroinstitute",
         variant: "destructive",
       })
     } finally {
@@ -55,7 +55,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
           src="/images/3333.jpg"
           alt="Login Visual"
           className="w-full h-full object-cover object-center"
-          style={{ minHeight: "100vh", background: "linear-gradient(135deg, #2060AC 0%, #164a87 100%)" }}
+          style={{ minHeight: "100vh", background: "linear-gradient(135deg, #003D9E 0%, #003D9E 100%)" }}
         />
       </div>
 

@@ -109,7 +109,7 @@ export default function CertificateGenerator() {
         x: 50,
         y: 50,
         size: 40,
-        color: "#ea580c", // Default orange to match branding
+        color: "#EC4724", // Default orange to match branding
         itemColor: "#000000",
         fontFamily: "serif",
         fontWeight: "bold",

@@ -12,15 +12,15 @@
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.15 0 0);
 
-  /* Brand — Sodma Primary #2060AC, Secondary #FCBE1A */
-  --primary: #2060AC;
+  /* Brand — Deero Primary #003D9E, Secondary #EC4724 */
+  --primary: #003D9E;
   --primary-foreground: #ffffff;
 
-  --secondary: #FCBE1A;
-  --secondary-foreground: #1a2e4a;
+  --secondary: #EC4724;
+  --secondary-foreground: #ffffff;
 
-  --accent: #FCBE1A;
-  --accent-foreground: #1a2e4a;
+  --accent: #EC4724;
+  --accent-foreground: #ffffff;
 
   /* Muted - Light Gray */
   --muted: oklch(0.93 0 0);
@@ -33,24 +33,24 @@
   /* Borders & Inputs */
   --border: oklch(0.92 0 0);
   --input: oklch(0.96 0 0);
-  --ring: #2060AC;
+  --ring: #003D9E;
 
   /* Sidebar */
   --sidebar: oklch(0.95 0 0);
   --sidebar-foreground: oklch(0.15 0 0);
-  --sidebar-primary: #2060AC;
+  --sidebar-primary: #003D9E;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #FCBE1A;
-  --sidebar-accent-foreground: #1a2e4a;
+  --sidebar-accent: #EC4724;
+  --sidebar-accent-foreground: #ffffff;
   --sidebar-border: oklch(0.92 0 0);
-  --sidebar-ring: #2060AC;
+  --sidebar-ring: #003D9E;
 
   /* Chart Colors */
-  --chart-1: #2060AC;
-  --chart-2: #FCBE1A;
-  --chart-3: #2060AC;
-  --chart-4: #FCBE1A;
-  --chart-5: #2060AC;
+  --chart-1: #003D9E;
+  --chart-2: #EC4724;
+  --chart-3: #003D9E;
+  --chart-4: #EC4724;
+  --chart-5: #003D9E;
 
   /* Radius */
   --radius: 0.5rem;
@@ -65,15 +65,15 @@
   --popover: oklch(0.18 0 0);
   --popover-foreground: oklch(0.95 0 0);
 
-  /* Brand — Sodma Primary #2060AC, Secondary #FCBE1A */
-  --primary: #2060AC;
+  /* Brand — Deero Primary #003D9E, Secondary #EC4724 */
+  --primary: #003D9E;
   --primary-foreground: #ffffff;
 
-  --secondary: #FCBE1A;
-  --secondary-foreground: #1a2e4a;
+  --secondary: #EC4724;
+  --secondary-foreground: #ffffff;
 
-  --accent: #FCBE1A;
-  --accent-foreground: #1a2e4a;
+  --accent: #EC4724;
+  --accent-foreground: #ffffff;
 
   /* Muted - Dark Gray */
   --muted: oklch(0.3 0.02 0);
@@ -86,24 +86,24 @@
   /* Borders & Inputs */
   --border: oklch(0.25 0 0);
   --input: oklch(0.2 0 0);
-  --ring: #2060AC;
+  --ring: #003D9E;
 
   /* Sidebar */
   --sidebar: oklch(0.15 0 0);
   --sidebar-foreground: oklch(0.95 0 0);
-  --sidebar-primary: #2060AC;
+  --sidebar-primary: #003D9E;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #FCBE1A;
-  --sidebar-accent-foreground: #1a2e4a;
+  --sidebar-accent: #EC4724;
+  --sidebar-accent-foreground: #ffffff;
   --sidebar-border: oklch(0.25 0 0);
-  --sidebar-ring: #2060AC;
+  --sidebar-ring: #003D9E;
 
   /* Chart Colors */
-  --chart-1: #2060AC;
-  --chart-2: #FCBE1A;
-  --chart-3: #2060AC;
-  --chart-4: #FCBE1A;
-  --chart-5: #2060AC;
+  --chart-1: #003D9E;
+  --chart-2: #EC4724;
+  --chart-3: #003D9E;
+  --chart-4: #EC4724;
+  --chart-5: #003D9E;
 }
 
 @theme inline {

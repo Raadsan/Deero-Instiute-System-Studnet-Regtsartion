@@ -420,8 +420,8 @@ export default function ClassesPage() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#2060AC]/10 via-background to-[#FCBE1A]/5 p-6 sm:p-8">
-        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#2060AC]/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
+        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#003D9E]/10 blur-3xl" />
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-background/80 border border-primary/15 px-3 py-1 text-xs font-medium text-primary">
@@ -507,7 +507,7 @@ export default function ClassesPage() {
                     <TableCell className="hidden md:table-cell py-4 text-muted-foreground">{cls.level ?? "—"}</TableCell>
                     <TableCell className="py-4 text-sm font-medium align-middle">
                       {cls.shift ? (
-                        <Badge variant="outline" className="rounded-full font-medium border-[#FCBE1A]/25 text-[#FCBE1A] bg-[#FCBE1A]/5">
+                        <Badge variant="outline" className="rounded-full font-medium border-[#EC4724]/25 text-[#EC4724] bg-[#EC4724]/5">
                           {formatShiftLabel(cls.shift)}
                         </Badge>
                       ) : (
@@ -534,7 +534,7 @@ export default function ClassesPage() {
                         variant="secondary"
                         className={`inline-flex min-w-[88px] justify-center rounded-full shadow-none px-3 py-1 text-xs font-semibold transition ${
                           cls.isActive
-                            ? "bg-[#2060AC]/10 text-[#2060AC] hover:bg-[#2060AC]/15 border border-[#2060AC]/20"
+                            ? "bg-[#003D9E]/10 text-[#003D9E] hover:bg-[#003D9E]/15 border border-[#003D9E]/20"
                             : "bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200"
                         } ${statusUpdating[cls.id] ? "opacity-60 cursor-wait" : "cursor-pointer"}`}
                       >

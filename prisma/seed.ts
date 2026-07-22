@@ -11,13 +11,13 @@ async function main() {
   await prisma.user.deleteMany({
     where: {
       email: {
-        in: ["admin@deeroinst6.com", "admin@sodma.com", "admission@deeroinst6.com"],
+        in: ["admin@deeroinst6.com", "admin@deeroinstitute.com", "admission@deeroinst6.com"],
       },
     },
   })
 
   await prisma.user.upsert({
-    where: { email: "admin@sodma" },
+    where: { email: "admin@deeroinstitute" },
     update: {
       name: "System Admin",
       role: "ADMIN",
@@ -26,7 +26,7 @@ async function main() {
     },
     create: {
       name: "System Admin",
-      email: "admin@sodma",
+      email: "admin@deeroinstitute",
       role: "ADMIN",
       isActive: true,
       password: adminPassword,
@@ -50,7 +50,7 @@ async function main() {
   })
 
   await prisma.user.upsert({
-    where: { email: "admission@sodma" },
+    where: { email: "admission@deeroinstitute" },
     update: {
       name: "Admission Staff",
       role: "REGISTRAR",
@@ -59,7 +59,7 @@ async function main() {
     },
     create: {
       name: "Admission Staff",
-      email: "admission@sodma",
+      email: "admission@deeroinstitute",
       role: "REGISTRAR",
       isActive: true,
       password: registrarPassword,
@@ -67,7 +67,7 @@ async function main() {
   })
 
   await prisma.user.upsert({
-    where: { email: "finance@sodma" },
+    where: { email: "finance@deeroinstitute" },
     update: {
       name: "Finance Officer",
       role: "FINANCE",
@@ -76,7 +76,7 @@ async function main() {
     },
     create: {
       name: "Finance Officer",
-      email: "finance@sodma",
+      email: "finance@deeroinstitute",
       role: "FINANCE",
       isActive: true,
       password: financePassword,

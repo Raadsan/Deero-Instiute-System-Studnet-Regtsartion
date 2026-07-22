@@ -230,8 +230,8 @@ export default function AttendanceView() {
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
-      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#2060AC]/10 via-background to-[#FCBE1A]/5 p-6 sm:p-8">
-        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#2060AC]/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
+        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#003D9E]/10 blur-3xl" />
         <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-2">
@@ -330,7 +330,7 @@ export default function AttendanceView() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {summaryRows.map((row) => (
                 <Card key={row.class.id} className="relative p-5 sm:p-6 transition-all hover:shadow-md border-muted/50 shadow-sm overflow-hidden">
-                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#2060AC] to-[#FCBE1A] opacity-80" />
+                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#003D9E] to-[#EC4724] opacity-80" />
                   <div className="flex items-start justify-between mb-5 gap-4 pt-1">
                     <div className="min-w-0 space-y-1">
                       <h3 className="text-lg font-bold text-foreground truncate tracking-tight capitalize">{row.class.name}</h3>
@@ -341,7 +341,7 @@ export default function AttendanceView() {
                     </div>
                     <div
                       className={`text-xl font-bold tabular-nums shrink-0 ${
-                        row.percentage >= 90 ? "text-emerald-600" : row.percentage >= 70 ? "text-[#2060AC]" : "text-amber-600"
+                        row.percentage >= 90 ? "text-emerald-600" : row.percentage >= 70 ? "text-[#003D9E]" : "text-amber-600"
                       }`}
                     >
                       {row.percentage}%

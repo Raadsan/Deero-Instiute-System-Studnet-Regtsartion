@@ -242,8 +242,8 @@ export default function MessagesCenter() {
       label: "Email",
       desc: "Send to students who have an email address saved.",
       icon: Mail,
-      activeBorder: "border-[#2060AC] bg-[#2060AC]/5 ring-2 ring-[#2060AC]/20",
-      iconActive: "bg-[#2060AC] text-white",
+      activeBorder: "border-[#003D9E] bg-[#003D9E]/5 ring-2 ring-[#003D9E]/20",
+      iconActive: "bg-[#003D9E] text-white",
     },
   ]
 
@@ -255,8 +255,8 @@ export default function MessagesCenter() {
       <div className="max-w-[1280px] grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(280px,320px)] md:gap-6 lg:gap-8 md:items-start">
         {/* Left: form column */}
         <div className="space-y-5 min-w-0">
-          <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#2060AC]/10 via-background to-[#FCBE1A]/5 p-5 sm:p-6">
-            <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#2060AC]/10 blur-3xl" />
+          <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-5 sm:p-6">
+            <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#003D9E]/10 blur-3xl" />
             <div className="relative space-y-1.5">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="secondary" className="rounded-full bg-background/80 border-primary/20 text-primary font-medium">

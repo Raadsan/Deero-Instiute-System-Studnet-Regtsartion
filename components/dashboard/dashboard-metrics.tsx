@@ -144,16 +144,16 @@ export default function DashboardMetrics() {
         value: summary ? String(summary.totalStudents) : "—",
         hint: summary ? `${summary.totalTeachers} teachers` : "",
         icon: Users,
-        accent: "from-[#2060AC]/15 to-[#2060AC]/5",
-        iconBg: "bg-[#2060AC]",
+        accent: "from-[#003D9E]/15 to-[#003D9E]/5",
+        iconBg: "bg-[#003D9E]",
       },
       {
         label: "Total Classes",
         value: summary ? String(summary.totalClasses) : "—",
         hint: "Active groups",
         icon: BookOpen,
-        accent: "from-[#FCBE1A]/15 to-[#FCBE1A]/5",
-        iconBg: "bg-[#FCBE1A]",
+        accent: "from-[#EC4724]/15 to-[#EC4724]/5",
+        iconBg: "bg-[#EC4724]",
       },
       {
         label: "Attendance Rate",
@@ -218,9 +218,9 @@ export default function DashboardMetrics() {
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#2060AC]/10 via-background to-[#FCBE1A]/5 p-6 sm:p-8">
-        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#2060AC]/10 blur-3xl" />
-        <div className="absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#FCBE1A]/10 blur-3xl" />
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
+        <div className="absolute -top-16 -right-16 h-48 w-48 rounded-full bg-[#003D9E]/10 blur-3xl" />
+        <div className="absolute -bottom-20 -left-10 h-40 w-40 rounded-full bg-[#EC4724]/10 blur-3xl" />
         <div className="relative flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
           <div className="space-y-2">
             <Badge variant="secondary" className="rounded-full bg-background/80 backdrop-blur-sm border-primary/20 text-primary font-medium">
@@ -365,12 +365,12 @@ export default function DashboardMetrics() {
                     </PieChart>
                   </ChartContainer>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-xl bg-[#2060AC]/8 border border-[#2060AC]/15 p-3 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#2060AC]">Paid</p>
+                    <div className="rounded-xl bg-[#003D9E]/8 border border-[#003D9E]/15 p-3 text-center">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#003D9E]">Paid</p>
                       <p className="text-xl font-bold text-foreground tabular-nums">{summary?.paidStudents ?? 0}</p>
                     </div>
-                    <div className="rounded-xl bg-[#FCBE1A]/8 border border-[#FCBE1A]/15 p-3 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#FCBE1A]">Unpaid</p>
+                    <div className="rounded-xl bg-[#EC4724]/8 border border-[#EC4724]/15 p-3 text-center">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#EC4724]">Unpaid</p>
                       <p className="text-xl font-bold text-foreground tabular-nums">{summary?.unpaidStudents ?? 0}</p>
                     </div>
                   </div>
