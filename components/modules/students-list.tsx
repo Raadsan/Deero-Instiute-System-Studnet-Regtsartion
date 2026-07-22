@@ -557,22 +557,63 @@ export default function StudentsList() {
         const wb = XLSX.read(bstr, { type: "binary" })
         const wsname = wb.SheetNames[0]
         const ws = wb.Sheets[wsname]
-        const data: any[] = XLSX.utils.sheet_to_json(ws)
+        // Read as 2D array to scan for headers on any row
+        const rawData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
+        
+        let headerRowIndex = -1
+        let nameColIndex = -1
+        let phoneColIndex = -1
 
-        const parsedStudents = data.map((row: any) => {
-          const rawName = row["Student name"] || row["Name"] || row["Student Name"] || row["student name"] || ""
-          const parts = String(rawName).trim().split(" ")
+        // Find the header row
+        for (let i = 0; i < rawData.length; i++) {
+          const row = rawData[i]
+          if (!Array.isArray(row)) continue
+          
+          for (let j = 0; j < row.length; j++) {
+            const cellValue = String(row[j] || "").trim().toLowerCase()
+            if (cellValue === "student name" || cellValue === "name") {
+              headerRowIndex = i
+              nameColIndex = j
+            }
+            if (cellValue === "phone" || cellValue === "phone number" || cellValue === "mobile") {
+              phoneColIndex = j
+            }
+          }
+          if (headerRowIndex !== -1) break
+        }
+
+        if (headerRowIndex === -1 || nameColIndex === -1) {
+          toast({ title: "No students found", description: "Could not find a 'Student name' column header in the file.", variant: "destructive" })
+          return
+        }
+
+        const parsedStudents = []
+        
+        // Parse rows below the header
+        for (let i = headerRowIndex + 1; i < rawData.length; i++) {
+          const row = rawData[i]
+          if (!Array.isArray(row)) continue
+          
+          const rawName = String(row[nameColIndex] || "").trim()
+          if (!rawName) continue // Skip empty rows
+
+          const parts = rawName.split(" ").filter(Boolean)
           const firstName = parts[0] || "Unknown"
           const lastName = parts.slice(1).join(" ") || "Unknown"
-          return {
-            firstName,
-            lastName,
-            phone: row["Phone"] || null,
+          
+          const phone = phoneColIndex !== -1 ? String(row[phoneColIndex] || "").trim() : null
+
+          if (firstName !== "Unknown" || lastName !== "Unknown") {
+            parsedStudents.push({
+              firstName,
+              lastName,
+              phone: phone || null,
+            })
           }
-        }).filter(s => s.firstName !== "Unknown" || s.lastName !== "Unknown")
+        }
 
         if (parsedStudents.length === 0) {
-          toast({ title: "No students found", description: "Ensure the Excel file has a 'Student name' column.", variant: "destructive" })
+          toast({ title: "No students found", description: "Found the columns, but no student names below them.", variant: "destructive" })
           return
         }
 
