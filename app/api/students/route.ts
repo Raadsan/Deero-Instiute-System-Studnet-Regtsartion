@@ -96,7 +96,7 @@ export async function GET(req: Request) {
     prisma.student.count({ where: finalWhere }),
     prisma.student.findMany({
       where: finalWhere,
-      orderBy: [{ lastName: "asc" }, { firstName: "asc" }, { createdAt: "desc" }],
+      orderBy: [{ firstName: "asc" }, { lastName: "asc" }, { createdAt: "desc" }],
       skip,
       take: pageSize,
     }),

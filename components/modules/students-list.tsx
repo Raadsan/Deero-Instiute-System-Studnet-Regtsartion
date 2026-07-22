@@ -617,6 +617,13 @@ export default function StudentsList() {
           return
         }
 
+        // Sort A-Z by first name, then last name
+        parsedStudents.sort((a, b) => {
+          const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
+          const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
+          return nameA.localeCompare(nameB)
+        })
+
         setBulkData(parsedStudents)
         setBulkClassId(NO_CLASS_VALUE)
         setBulkImportOpen(true)
