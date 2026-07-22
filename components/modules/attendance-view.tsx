@@ -90,6 +90,8 @@ export default function AttendanceView() {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [downloading, setDownloading] = useState(false)
   const [activeTab, setActiveTab] = useState<"daily" | "history">("daily")
+  const [statusFilter, setStatusFilter] = useState<string>("ALL")
+  const [genderFilter, setGenderFilter] = useState<string>("ALL")
 
   useEffect(() => {
     const run = async () => {
@@ -184,6 +186,22 @@ export default function AttendanceView() {
     const total = dayTotals.present + dayTotals.absent
     return total > 0 ? Math.round((dayTotals.present / total) * 100) : 0
   }, [dayTotals])
+
+  const filteredRecords = useMemo(() => {
+    if (!records?.data) return []
+    return records.data.filter((r) => {
+      // Status Filter
+      if (statusFilter === "PRESENT" && r.status !== "PRESENT") return false
+      if (statusFilter === "ABSENT" && r.status !== "ABSENT") return false
+      
+      // Gender Filter
+      const gender = (r.student?.gender || "UNKNOWN").toUpperCase()
+      if (genderFilter === "MALE" && gender !== "MALE") return false
+      if (genderFilter === "FEMALE" && gender !== "FEMALE") return false
+      
+      return true
+    })
+  }, [records, statusFilter, genderFilter])
 
   const downloadCsv = async () => {
     if (!selectedClassId || selectedClassId === ALL_CLASS_VALUE) return
@@ -388,9 +406,39 @@ export default function AttendanceView() {
                   </Badge>
                 ) : (
                   <Badge variant="secondary" className="w-fit rounded-full font-medium tabular-nums">
-                    {records?.total ?? 0} records
+                    {filteredRecords.length} records
                   </Badge>
                 )}
+              </div>
+              {/* Filters for Daily View */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 mt-4 border-t border-muted/50">
+                 <div className="space-y-2">
+                   <p className="text-sm font-medium">Filter by Status</p>
+                   <Select value={statusFilter} onValueChange={setStatusFilter}>
+                     <SelectTrigger className="h-10 bg-background">
+                       <SelectValue placeholder="All Statuses" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="ALL">All Statuses</SelectItem>
+                       <SelectItem value="PRESENT">Present</SelectItem>
+                       <SelectItem value="ABSENT">Absent</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
+                 
+                 <div className="space-y-2">
+                   <p className="text-sm font-medium">Filter by Gender</p>
+                   <Select value={genderFilter} onValueChange={setGenderFilter}>
+                     <SelectTrigger className="h-10 bg-background">
+                       <SelectValue placeholder="All Genders" />
+                     </SelectTrigger>
+                     <SelectContent>
+                       <SelectItem value="ALL">All Genders</SelectItem>
+                       <SelectItem value="MALE">Male</SelectItem>
+                       <SelectItem value="FEMALE">Female</SelectItem>
+                     </SelectContent>
+                   </Select>
+                 </div>
               </div>
             </div>
 
@@ -410,7 +458,7 @@ export default function AttendanceView() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {records.data.map((r) => (
+                    {filteredRecords.map((r) => (
                       <TableRow key={r.id} className="hover:bg-muted/40 transition-colors border-b-muted/40 last:border-0">
                         <TableCell className="py-4 pl-6 align-middle">
                           <div className="space-y-0.5">
@@ -423,6 +471,14 @@ export default function AttendanceView() {
                               <span className="font-mono text-[10px]">
                                 {r.createdAt ? new Date(r.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
                               </span>
+                            </div>
+                            <div className="flex gap-2 items-center mt-1">
+                              {r.student?.gender && <Badge variant="outline" className="text-[10px]">{r.student.gender}</Badge>}
+                              {r.student?.attendancePercentage != null && (
+                                <Badge variant="outline" className={`text-[10px] border-transparent ${r.student.attendancePercentage >= 80 ? "bg-emerald-100 text-emerald-800" : r.student.attendancePercentage >= 50 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"}`}>
+                                  {r.student.attendancePercentage}% att
+                                </Badge>
+                              )}
                             </div>
                           </div>
                         </TableCell>

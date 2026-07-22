@@ -24,6 +24,8 @@ type StudentRow = {
   id: string
   firstName: string
   lastName: string
+  gender?: string | null
+  attendancePercentage?: number | null
 }
 
 type AttendanceStatus = "PRESENT" | "ABSENT"
@@ -43,6 +45,9 @@ export default function TeacherAttendance() {
   const [loadingClasses, setLoadingClasses] = useState(true)
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+
+  const [statusFilter, setStatusFilter] = useState<string>("ALL")
+  const [genderFilter, setGenderFilter] = useState<string>("ALL")
 
   useEffect(() => {
     const run = async () => {
@@ -131,11 +136,30 @@ export default function TeacherAttendance() {
 
   const markAll = (status: AttendanceStatus) => {
     setStatusByStudentId((current) => {
+    setStatusByStudentId((current) => {
       const next = { ...current }
-      for (const s of students) next[s.id] = status
+      for (const s of filteredStudents) next[s.id] = status
       return next
     })
   }
+
+  const filteredStudents = useMemo(() => {
+    return students.filter((s) => {
+      const currentStatus = statusByStudentId[s.id] ?? "ABSENT" // Or actually, if we want to filter truly unmarked, wait, default is always ABSENT in UI? Actually in load it's either PRESENT or ABSENT.
+      const isUnmarked = statusByStudentId[s.id] === undefined
+      
+      // Status Filter
+      if (statusFilter === "PRESENT" && currentStatus !== "PRESENT") return false
+      if (statusFilter === "ABSENT" && currentStatus !== "ABSENT") return false
+      
+      // Gender Filter
+      const gender = (s.gender || "UNKNOWN").toUpperCase()
+      if (genderFilter === "MALE" && gender !== "MALE") return false
+      if (genderFilter === "FEMALE" && gender !== "FEMALE") return false
+      
+      return true
+    })
+  }, [students, statusByStudentId, statusFilter, genderFilter])
 
   const submit = async () => {
     if (!selectedClassId) return
@@ -289,19 +313,50 @@ export default function TeacherAttendance() {
             />
           </div>
 
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Action</p>
-            <div className="flex gap-2">
-              <Button className="flex-1 h-11 border-2" variant="outline" onClick={() => markAll("PRESENT")} disabled={!students.length}>
-                All Present
-              </Button>
-              <Button className="flex-1 h-11 border-2" variant="outline" onClick={() => markAll("ABSENT")} disabled={!students.length}>
-                All Absent
-              </Button>
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Action</p>
+              <div className="flex gap-2">
+                <Button className="flex-1 h-11 border-2" variant="outline" onClick={() => markAll("PRESENT")} disabled={!filteredStudents.length}>
+                  All Present
+                </Button>
+                <Button className="flex-1 h-11 border-2" variant="outline" onClick={() => markAll("ABSENT")} disabled={!filteredStudents.length}>
+                  All Absent
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
-      </Card>
+          
+          {/* Filters Row */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-muted/50">
+             <div className="space-y-2">
+               <p className="text-sm font-medium">Filter by Status</p>
+               <Select value={statusFilter} onValueChange={setStatusFilter}>
+                 <SelectTrigger className="h-11">
+                   <SelectValue placeholder="All Statuses" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="ALL">All Students</SelectItem>
+                   <SelectItem value="PRESENT">Present</SelectItem>
+                   <SelectItem value="ABSENT">Absent</SelectItem>
+                 </SelectContent>
+               </Select>
+             </div>
+             
+             <div className="space-y-2">
+               <p className="text-sm font-medium">Filter by Gender</p>
+               <Select value={genderFilter} onValueChange={setGenderFilter}>
+                 <SelectTrigger className="h-11">
+                   <SelectValue placeholder="All Genders" />
+                 </SelectTrigger>
+                 <SelectContent>
+                   <SelectItem value="ALL">All Genders</SelectItem>
+                   <SelectItem value="MALE">Male</SelectItem>
+                   <SelectItem value="FEMALE">Female</SelectItem>
+                 </SelectContent>
+               </Select>
+             </div>
+          </div>
+        </Card>
 
       {selectedClass && !(selectedClass.scheduleDays ?? []).length && (
         <Card className="p-4 border-amber-200 bg-amber-50 text-amber-900 text-sm">
@@ -333,21 +388,23 @@ export default function TeacherAttendance() {
           <>
             {/* Mobile cards */}
             <div className="sm:hidden p-3 space-y-3 bg-muted/20">
-              {students.map((s) => {
+              {filteredStudents.map((s, index) => {
                 const status = statusByStudentId[s.id] ?? "ABSENT"
-                const initials = `${s.firstName[0]}${s.lastName[0]}`.toUpperCase()
+                const pct = s.attendancePercentage
+                const badgeColor = pct == null ? "bg-muted text-muted-foreground" : pct >= 80 ? "bg-emerald-100 text-emerald-800" : pct >= 50 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
                 
                 return (
-                  <div key={s.id} className="bg-card border rounded-2xl p-4 shadow-sm space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm">
-                        {initials}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="font-bold text-foreground text-base truncate">
-                          {s.firstName} {s.lastName}
+                  <div key={s.id} className="bg-muted/30 p-4 rounded-xl border border-border space-y-3 relative overflow-hidden">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <div className="font-bold text-lg mb-1">{s.firstName} {s.lastName}</div>
+                        <div className="flex gap-2 items-center">
+                          <span className="text-xs text-muted-foreground font-mono">No. {index + 1}</span>
+                          {s.gender && <Badge variant="outline" className="text-[10px]">{s.gender}</Badge>}
+                          <Badge variant="outline" className={`text-[10px] border-transparent ${badgeColor}`}>
+                            {pct != null ? `${pct}% att` : 'N/A'}
+                          </Badge>
                         </div>
-                        <div className="text-xs text-muted-foreground font-mono">ID: {s.id.slice(-6).toUpperCase()}</div>
                       </div>
                       <Badge 
                         variant={status === "PRESENT" ? "default" : "destructive"} 
@@ -391,20 +448,31 @@ export default function TeacherAttendance() {
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
-                    <TableHead className="w-[100px] py-4 pl-6">Student ID</TableHead>
+                    <TableHead className="w-[100px] py-4 pl-6">No.</TableHead>
                     <TableHead className="py-4">Full Name</TableHead>
+                    <TableHead className="py-4">Gender & Att %</TableHead>
                     <TableHead className="py-4">Status</TableHead>
                     <TableHead className="py-4 text-right pr-6">Quick Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {students.map((s) => {
+                  {filteredStudents.map((s, index) => {
                     const status = statusByStudentId[s.id] ?? "ABSENT"
+                    const pct = s.attendancePercentage
+                    const badgeColor = pct == null ? "bg-muted text-muted-foreground" : pct >= 80 ? "bg-emerald-100 text-emerald-800" : pct >= 50 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
                     return (
                       <TableRow key={s.id} className="hover:bg-muted/40 transition-colors border-b">
-                        <TableCell className="pl-6 py-4 font-mono text-xs text-muted-foreground uppercase">{s.id.slice(-6)}</TableCell>
+                        <TableCell className="pl-6 py-4 font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
                         <TableCell className="py-4 font-bold text-foreground font-medium">
                           {s.firstName} {s.lastName}
+                        </TableCell>
+                        <TableCell className="py-4">
+                          <div className="flex gap-2 items-center">
+                            {s.gender && <Badge variant="outline" className="text-[10px]">{s.gender}</Badge>}
+                            <Badge variant="outline" className={`text-[10px] border-transparent ${badgeColor}`}>
+                              {pct != null ? `${pct}%` : 'N/A'}
+                            </Badge>
+                          </div>
                         </TableCell>
                         <TableCell className="py-4">
                           <Badge 

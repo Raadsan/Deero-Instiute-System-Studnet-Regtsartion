@@ -39,7 +39,15 @@ export async function GET(req: NextRequest) {
     studentIds.length
       ? prisma.student.findMany({
           where: { id: { in: studentIds } },
-          select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+          select: { 
+            id: true, 
+            firstName: true, 
+            lastName: true, 
+            email: true, 
+            phone: true,
+            gender: true,
+            attendances: { select: { status: true } }
+          },
         })
       : [],
     teacherIds.length
@@ -52,16 +60,24 @@ export async function GET(req: NextRequest) {
   ])
 
   const studentMap = new Map(
-    students.map((s) => [
-      s.id,
-      {
-        id: s.id,
-        firstName: s.firstName ?? "",
-        lastName: s.lastName ?? "",
-        email: s.email ?? null,
-        phone: s.phone ?? null,
-      },
-    ]),
+    students.map((s) => {
+      const total = s.attendances.length
+      const presentCount = s.attendances.filter(a => a.status === "PRESENT").length
+      const percentage = total > 0 ? Math.round((presentCount / total) * 100) : null
+      
+      return [
+        s.id,
+        {
+          id: s.id,
+          firstName: s.firstName ?? "",
+          lastName: s.lastName ?? "",
+          email: s.email ?? null,
+          phone: s.phone ?? null,
+          gender: s.gender ?? null,
+          attendancePercentage: percentage
+        },
+      ]
+    }),
   )
   const teacherMap = new Map(
     teachers

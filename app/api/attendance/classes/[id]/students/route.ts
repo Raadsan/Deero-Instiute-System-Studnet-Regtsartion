@@ -61,15 +61,35 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
 
   const students = await prisma.student.findMany({
     where: { classId, isActive: true },
-    select: { id: true, firstName: true, lastName: true },
-    orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+    select: { 
+      id: true, 
+      firstName: true, 
+      lastName: true,
+      gender: true,
+      attendances: {
+        select: { status: true }
+      }
+    },
+    orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
   })
 
   return NextResponse.json({
     className: cls.name,
     scheduleDays,
     isScheduledDay: true,
-    students: students.map((s) => ({ id: s.id, firstName: s.firstName, lastName: s.lastName })),
+    students: students.map((s) => {
+      const total = s.attendances.length
+      const presentCount = s.attendances.filter(a => a.status === "PRESENT").length
+      const percentage = total > 0 ? Math.round((presentCount / total) * 100) : null
+      
+      return { 
+        id: s.id, 
+        firstName: s.firstName, 
+        lastName: s.lastName,
+        gender: s.gender,
+        attendancePercentage: percentage
+      }
+    }),
     attendance: attendanceMap,
   })
 }
