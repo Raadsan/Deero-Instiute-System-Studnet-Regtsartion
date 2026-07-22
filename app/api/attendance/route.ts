@@ -1,0 +1,163 @@
+import { NextResponse } from "next/server"
+import { prisma } from "@/lib/prisma"
+import { getSessionFromRequestCookies } from "@/lib/auth"
+import { isClassScheduledOnDate } from "@/lib/class-schedule"
+import { enqueueAndSendWhatsAppMessage, hasRecentAbsenceAlert } from "@/lib/whatsapp-queue"
+import { enqueueAndSendEmailMessage, hasRecentAbsenceEmailAlert } from "@/lib/email-queue"
+import { buildBroadcastEmailTemplate } from "@/lib/email-templates"
+import { getBrandName } from "@/lib/brand"
+
+export async function POST(req: Request) {
+  const session = await getSessionFromRequestCookies()
+  if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 })
+  if (session.role !== "TEACHER") return NextResponse.json({ message: "Forbidden" }, { status: 403 })
+
+  const body = await req.json()
+
+  const date = new Date(body.date)
+  if (Number.isNaN(date.getTime())) return NextResponse.json({ message: "Invalid date" }, { status: 400 })
+
+  const classId = body.classId as string
+  if (!classId) return NextResponse.json({ message: "classId is required" }, { status: 400 })
+
+  const teacherId = session.userId
+
+  const items = body.items as Array<{ studentId: string; status: "PRESENT" | "ABSENT"; note?: string }>
+  if (!Array.isArray(items) || items.length === 0) {
+    return NextResponse.json({ message: "items is required" }, { status: 400 })
+  }
+
+  const cls = await prisma.class.findUnique({
+    where: { id: classId },
+    select: { teacherId: true, isActive: true, scheduleDays: true },
+  })
+  if (!cls) return NextResponse.json({ message: "Class not found" }, { status: 404 })
+  if (!cls.isActive) return NextResponse.json({ message: "Class is inactive" }, { status: 400 })
+  if (cls.teacherId !== teacherId) {
+    return NextResponse.json({ message: "You are not assigned to this class" }, { status: 403 })
+  }
+
+  if (!isClassScheduledOnDate(cls.scheduleDays ?? [], date)) {
+    return NextResponse.json(
+      { message: "Attendance can only be recorded on scheduled class days" },
+      { status: 400 },
+    )
+  }
+
+  const studentIds = items.map((it) => it.studentId)
+  const uniqueStudentIds = Array.from(new Set(studentIds))
+
+  const students = await prisma.student.findMany({
+    where: { id: { in: uniqueStudentIds }, classId },
+    select: { id: true },
+  })
+
+  if (students.length !== uniqueStudentIds.length) {
+    return NextResponse.json({ message: "Some students do not belong to this class" }, { status: 400 })
+  }
+
+  const dayStart = new Date(date)
+  dayStart.setHours(0, 0, 0, 0)
+  const dayEnd = new Date(dayStart)
+  dayEnd.setDate(dayEnd.getDate() + 1)
+
+  await prisma.attendance.deleteMany({
+    where: {
+      classId,
+      studentId: { in: uniqueStudentIds },
+      date: { gte: dayStart, lt: dayEnd },
+    },
+  })
+
+  const docs = items.map((it) => ({
+    date: dayStart,
+    classId,
+    teacherId,
+    studentId: it.studentId,
+    status: it.status,
+    note: it.note ?? null,
+  }))
+
+  const created = await prisma.attendance.createMany({ data: docs })
+
+  const channel = (process.env.NOTIFICATIONS_CHANNEL ?? "email").toLowerCase()
+
+  const absentStudentIds = Array.from(new Set(items.filter((x) => x.status === "ABSENT").map((x) => x.studentId)))
+  if (absentStudentIds.length) {
+    const windowDays = 30
+    const threshold = 3
+    const since = new Date(dayStart)
+    since.setDate(since.getDate() - windowDays)
+
+    const phones = await prisma.student.findMany({
+      where: { id: { in: absentStudentIds } },
+      select: { id: true, firstName: true, lastName: true, phone: true, email: true, classId: true },
+    })
+
+    const phoneMap = new Map<string, { name: string; phone: string | null }>(
+      phones.map((s) => [
+        s.id,
+        { name: `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() || "Student", phone: s.phone ?? null },
+      ]),
+    )
+
+    const emailMap = new Map<string, { name: string; email: string | null }>(
+      phones.map((s) => [
+        s.id,
+        { name: `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() || "Student", email: s.email ?? null },
+      ]),
+    )
+
+    await Promise.all(
+      absentStudentIds.map(async (studentId) => {
+        const count = await prisma.attendance.count({
+          where: {
+            studentId,
+            classId,
+            status: "ABSENT",
+            date: { gte: since, lte: dayStart },
+          },
+        })
+
+        if (count < threshold) return
+
+        const msg = `Attendance Alert: ${emailMap.get(studentId)?.name ?? "Student"} has been absent ${threshold} times in the last ${windowDays} days. Please ensure attendance improves.`
+
+        if (channel === "whatsapp" || channel === "both") {
+          const already = await hasRecentAbsenceAlert({ studentId, classId, absentCount: threshold, withinDays: windowDays })
+          if (!already) {
+            const info = phoneMap.get(studentId) ?? { name: "Student", phone: null }
+            await enqueueAndSendWhatsAppMessage({
+              to: info.phone,
+              body: msg,
+              meta: { kind: "ABSENCE_ALERT", studentId, classId, absentCount: threshold, windowDays },
+            })
+          }
+        }
+
+        if (channel === "email" || channel === "both") {
+          const already = await hasRecentAbsenceEmailAlert({ studentId, classId, absentCount: threshold, withinDays: windowDays })
+          if (already) return
+          const info = emailMap.get(studentId) ?? { name: "Student", email: null }
+          const template = buildBroadcastEmailTemplate({
+            subject: "Attendance Alert",
+            message: msg,
+            contextTitle: "Attendance Alert",
+            contextSubtitle: `Class: ${classId}`,
+            logoCid: "brandlogo",
+            brandName: getBrandName(),
+          })
+          await enqueueAndSendEmailMessage({
+            to: info.email,
+            subject: "Attendance Alert",
+            text: template.text,
+            html: template.html,
+            meta: { kind: "ABSENCE_ALERT", studentId, classId, absentCount: threshold, windowDays },
+          })
+        }
+      }),
+    )
+  }
+
+  return NextResponse.json({ ok: true, count: created.count })
+}

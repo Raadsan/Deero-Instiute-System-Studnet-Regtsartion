@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sodma-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: sodma
+    ports:
+      - "5432:5432"
+    volumes:
+      - sodma_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d sodma"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sodma-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/sodma
+      JWT_SECRET: ${JWT_SECRET:-change-me-to-a-long-random-secret-at-least-32-chars}
+      CRON_SECRET: ${CRON_SECRET:-change-me-to-a-long-random-cron-secret}
+      VISIT_REMINDER_CRON_TIME: ${VISIT_REMINDER_CRON_TIME:-07:00}
+      APP_URL: ${APP_URL:-http://localhost:3000}
+      SMS_HORMUUD_USERNAME: ${SMS_HORMUUD_USERNAME:-}
+      SMS_HORMUUD_PASSWORD: ${SMS_HORMUUD_PASSWORD:-}
+      SMS_HORMUUD_SENDER_ID: ${SMS_HORMUUD_SENDER_ID:-}
+      WHATSAPP_PROVIDER: ${WHATSAPP_PROVIDER:-meta}
+      WHATSAPP_TOKEN: ${WHATSAPP_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  sodma_pgdata:

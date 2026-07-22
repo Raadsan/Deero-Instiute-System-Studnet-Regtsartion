@@ -1,0 +1,435 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../lib/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  REGISTRAR
+  FINANCE
+}
+
+enum PaymentStatus {
+  PAID
+  UNPAID
+}
+
+enum EnrollmentStatus {
+  ENROLLED
+  VISIT_SCHEDULED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+}
+
+enum CourseStatus {
+  ACTIVE
+  SCHEDULED
+  INACTIVE
+}
+
+enum MessageStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+enum CompensationType {
+  SALARY
+  PERCENTAGE
+}
+
+enum FinanceEntryType {
+  INCOME
+  EXPENSE
+}
+
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role     @default(TEACHER)
+  isActive  Boolean  @default(true)
+
+  classes            Class[]            @relation("TeacherClasses")
+  courses            Course[]           @relation("TeacherCourses")
+  attendances        Attendance[]       @relation("AttendanceTeacher")
+  registeredStudents Student[]          @relation("RegisteredBy")
+  teacherContracts   TeacherContract[]  @relation("TeacherContracts")
+  recordedPayments         Payment[]               @relation("PaymentRecordedBy")
+  recordedPartnerPayouts   PartnerPayout[]         @relation("PartnerPayoutRecordedBy")
+  recordedTeacherPayouts   TeacherContractPayout[] @relation("TeacherPayoutRecordedBy")
+  recordedStaffPayouts     StaffSalaryPayout[]     @relation("StaffPayoutRecordedBy")
+  recordedFinanceEntries   FinanceEntry[]          @relation("FinanceEntryRecordedBy")
+  passwordResetTokens      PasswordResetToken[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, isActive])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Shift {
+  id        String  @id @default(cuid())
+  name      String
+  startTime String?
+  endTime   String?
+  isActive  Boolean @default(true)
+
+  classes Class[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Class {
+  id       String  @id @default(cuid())
+  name     String
+  level    String?
+  isActive Boolean @default(true)
+
+  teacherId String?
+  teacher   User?   @relation("TeacherClasses", fields: [teacherId], references: [id], onDelete: SetNull)
+
+  shiftId String?
+  shift   Shift?  @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+
+  /** Weekdays when class meets: 0=Sun, 1=Mon, ... 6=Sat */
+  scheduleDays Int[] @default([])
+
+  students    Student[]
+  courses     Course[]
+  attendances Attendance[] @relation("AttendanceClass")
+  partnerLink        PartnerClass?
+  teacherContracts   TeacherContract[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([shiftId])
+  @@index([teacherId])
+}
+
+model TeacherContract {
+  id               String             @id @default(cuid())
+  compensationType CompensationType
+  salaryAmount     Float?
+  percentage       Float?
+  isActive         Boolean            @default(true)
+  note             String?
+
+  teacherId String
+  teacher   User   @relation("TeacherContracts", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  classId String
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  payouts TeacherContractPayout[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([teacherId, classId])
+  @@index([teacherId])
+  @@index([classId])
+}
+
+model TeacherContractPayout {
+  id       String   @id @default(cuid())
+  amount   Float
+  currency String   @default("USD")
+  paidAt   DateTime @default(now())
+  note     String?
+  period   String?
+
+  contractId String
+  contract   TeacherContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  recordedById String?
+  recordedBy   User?   @relation("TeacherPayoutRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([contractId])
+  @@index([paidAt])
+  @@index([recordedById])
+}
+
+model Partner {
+  id            String  @id @default(cuid())
+  name          String
+  contactName   String?
+  phone         String?
+  email         String?
+  feePerStudent Float   @default(0)
+  isActive      Boolean @default(true)
+
+  classes PartnerClass[]
+  payouts PartnerPayout[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PartnerClass {
+  id            String  @id @default(cuid())
+  feePerStudent Float?
+
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  classId String @unique
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([partnerId])
+}
+
+model PartnerPayout {
+  id       String   @id @default(cuid())
+  amount   Float
+  currency String   @default("USD")
+  paidAt   DateTime @default(now())
+  note     String?
+  period   String?
+
+  partnerId String
+  partner   Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  recordedById String?
+  recordedBy   User?   @relation("PartnerPayoutRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([partnerId])
+  @@index([paidAt])
+  @@index([recordedById])
+}
+
+model Student {
+  id                  String           @id @default(cuid())
+  firstName           String
+  lastName            String
+  phone               String?
+  email               String?
+  gender              String?
+  paymentStatus       PaymentStatus    @default(UNPAID)
+  enrollmentStatus    EnrollmentStatus @default(ENROLLED)
+  visitDate           DateTime?
+  visitNote           String?
+  visitReminderSentAt DateTime?
+  isActive            Boolean          @default(true)
+
+  classId String?
+  class   Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
+
+  registeredById String?
+  registeredBy   User?   @relation("RegisteredBy", fields: [registeredById], references: [id], onDelete: SetNull)
+
+  attendances Attendance[]
+  payments    Payment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([classId])
+  @@index([paymentStatus])
+  @@index([enrollmentStatus])
+  @@index([visitDate])
+  @@index([registeredById])
+  @@index([isActive, paymentStatus])
+  @@index([isActive, enrollmentStatus, visitDate])
+  @@index([createdAt])
+}
+
+model Course {
+  id     String       @id @default(cuid())
+  name   String
+  status CourseStatus @default(ACTIVE)
+
+  classId String
+  class   Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  teacherId String?
+  teacher   User?   @relation("TeacherCourses", fields: [teacherId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([classId])
+  @@index([teacherId])
+}
+
+model Attendance {
+  id     String           @id @default(cuid())
+  date   DateTime
+  status AttendanceStatus
+  note   String?
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  classId String
+  class   Class  @relation("AttendanceClass", fields: [classId], references: [id], onDelete: Cascade)
+
+  teacherId String?
+  teacher   User?   @relation("AttendanceTeacher", fields: [teacherId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([date])
+  @@index([classId, date])
+  @@index([studentId, date])
+  @@index([studentId, classId, status, date])
+}
+
+model AttendanceArchive {
+  id         String           @id @default(cuid())
+  originalId String
+  date       DateTime
+  status     AttendanceStatus
+  note       String?
+  studentId  String
+  classId    String
+  teacherId  String?
+  recordedAt DateTime
+  archivedAt DateTime         @default(now())
+
+  @@index([date])
+  @@index([classId, date])
+  @@index([studentId, date])
+  @@unique([originalId])
+}
+
+model Payment {
+  id       String   @id @default(cuid())
+  amount   Float
+  currency String   @default("USD")
+  paidAt   DateTime @default(now())
+  note     String?
+
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  recordedById String?
+  recordedBy   User?   @relation("PaymentRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([paidAt])
+  @@index([studentId])
+  @@index([recordedById])
+}
+
+model EmailMessage {
+  id                String        @id @default(cuid())
+  to                String?
+  subject           String
+  text              String
+  meta              Json
+  status            MessageStatus
+  error             String?
+  providerMessageId String?
+  sentAt            DateTime?
+  createdAt         DateTime      @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model WhatsAppMessage {
+  id                String        @id @default(cuid())
+  to                String?
+  body              String
+  meta              Json
+  status            MessageStatus
+  error             String?
+  errorStatus       Int?
+  providerMessageId String?
+  sentAt            DateTime?
+  createdAt         DateTime      @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model Staff {
+  id            String  @id @default(cuid())
+  name          String
+  email         String?
+  phone         String?
+  jobTitle      String?
+  monthlySalary Float   @default(0)
+  isActive      Boolean @default(true)
+
+  payouts StaffSalaryPayout[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model StaffSalaryPayout {
+  id       String   @id @default(cuid())
+  amount   Float
+  currency String   @default("USD")
+  paidAt   DateTime @default(now())
+  note     String?
+  period   String?
+
+  staffId String
+  staff   Staff  @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  recordedById String?
+  recordedBy   User?   @relation("StaffPayoutRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([staffId])
+  @@index([paidAt])
+  @@index([recordedById])
+}
+
+model FinanceEntry {
+  id         String           @id @default(cuid())
+  type       FinanceEntryType
+  title      String
+  amount     Float
+  category   String?
+  note       String?
+  occurredAt DateTime         @default(now())
+
+  recordedById String?
+  recordedBy   User?   @relation("FinanceEntryRecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([type])
+  @@index([occurredAt])
+  @@index([recordedById])
+}

@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Class" ADD COLUMN "scheduleDays" INTEGER[] NOT NULL DEFAULT ARRAY[]::INTEGER[];
