@@ -136,7 +136,6 @@ export default function TeacherAttendance() {
 
   const markAll = (status: AttendanceStatus) => {
     setStatusByStudentId((current) => {
-    setStatusByStudentId((current) => {
       const next = { ...current }
       for (const s of filteredStudents) next[s.id] = status
       return next
