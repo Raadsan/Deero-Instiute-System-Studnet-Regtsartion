@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { Plus, Pencil, Trash2, Search, Users, CalendarClock, GraduationCap } from "lucide-react"
+import { useEffect, useState, useRef } from "react"
+import { Plus, Pencil, Trash2, Search, Users, CalendarClock, GraduationCap, Upload } from "lucide-react"
+import * as XLSX from "xlsx"
 
 import { api } from "@/lib/api"
 import { formatVisitDateInput, getNextSaturday } from "@/lib/visit-messages"
@@ -172,6 +173,12 @@ export default function StudentsList() {
   const [deleting, setDeleting] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({})
   const [paymentUpdating, setPaymentUpdating] = useState<Record<string, boolean>>({})
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [bulkImportOpen, setBulkImportOpen] = useState(false)
+  const [bulkData, setBulkData] = useState<any[]>([])
+  const [bulkClassId, setBulkClassId] = useState<string>(NO_CLASS_VALUE)
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const resetForm = () => {
     setEditing(null)
@@ -539,6 +546,69 @@ export default function StudentsList() {
     }
   }
 
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const reader = new FileReader()
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result
+        const wb = XLSX.read(bstr, { type: "binary" })
+        const wsname = wb.SheetNames[0]
+        const ws = wb.Sheets[wsname]
+        const data: any[] = XLSX.utils.sheet_to_json(ws)
+
+        const parsedStudents = data.map((row: any) => {
+          const rawName = row["Student name"] || row["Name"] || row["Student Name"] || row["student name"] || ""
+          const parts = String(rawName).trim().split(" ")
+          const firstName = parts[0] || "Unknown"
+          const lastName = parts.slice(1).join(" ") || "Unknown"
+          return {
+            firstName,
+            lastName,
+            phone: row["Phone"] || null,
+          }
+        }).filter(s => s.firstName !== "Unknown" || s.lastName !== "Unknown")
+
+        if (parsedStudents.length === 0) {
+          toast({ title: "No students found", description: "Ensure the Excel file has a 'Student name' column.", variant: "destructive" })
+          return
+        }
+
+        setBulkData(parsedStudents)
+        setBulkClassId(NO_CLASS_VALUE)
+        setBulkImportOpen(true)
+      } catch (error) {
+        console.error(error)
+        toast({ title: "Failed to parse file", description: "Make sure it is a valid Excel or CSV file.", variant: "destructive" })
+      }
+    }
+    reader.readAsBinaryString(file)
+    // reset input
+    if (fileInputRef.current) fileInputRef.current.value = ""
+  }
+
+  const confirmBulkImport = async () => {
+    setBulkSaving(true)
+    try {
+      const payload = bulkData.map(s => ({
+        ...s,
+        classId: bulkClassId === NO_CLASS_VALUE ? null : bulkClassId
+      }))
+
+      const res = await api.post("/api/students/bulk", { students: payload })
+      toast({ title: "Bulk Import Successful", description: `Successfully imported ${res.data.count} students.` })
+      setBulkImportOpen(false)
+      setBulkData([])
+      await fetchStudents()
+    } catch (e: any) {
+      toast({ title: "Import failed", description: getErrorMessage(e), variant: "destructive" })
+    } finally {
+      setBulkSaving(false)
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
       <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
@@ -558,9 +628,15 @@ export default function StudentsList() {
                 : "Manage student records, class assignments, and payments."}
             </p>
           </div>
-          <Button onClick={openCreate} size="lg" className="w-full sm:w-auto rounded-full shadow-lg hover:shadow-primary/25 transition-all gap-2 px-6 shrink-0">
-            <Plus className="w-5 h-5" /> Add Student
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto shrink-0">
+            <input type="file" ref={fileInputRef} accept=".xlsx, .xls, .csv" onChange={handleFileUpload} className="hidden" />
+            <Button onClick={() => fileInputRef.current?.click()} variant="outline" size="lg" className="w-full sm:w-auto rounded-full shadow-sm gap-2 px-6 bg-background/50 hover:bg-background">
+              <Upload className="w-5 h-5" /> Upload Excel
+            </Button>
+            <Button onClick={openCreate} size="lg" className="w-full sm:w-auto rounded-full shadow-lg hover:shadow-primary/25 transition-all gap-2 px-6">
+              <Plus className="w-5 h-5" /> Add Student
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -1193,6 +1269,67 @@ export default function StudentsList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={bulkImportOpen} onOpenChange={(open) => !open && setBulkImportOpen(false)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Confirm Bulk Import</DialogTitle>
+            <DialogDescription>
+              We found {bulkData.length} student{bulkData.length !== 1 && "s"} in your file. 
+              They will be registered as <strong>Enrolled</strong> and <strong>Unpaid</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>Assign to Class (Optional)</Label>
+              <Select value={bulkClassId} onValueChange={setBulkClassId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="No Class" />
+                </SelectTrigger>
+                <SelectContent className={selectContentClass} position="popper">
+                  <SelectItem value={NO_CLASS_VALUE}>-- No Class --</SelectItem>
+                  {classes.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                If you select a class, all {bulkData.length} students will be added to it.
+              </p>
+            </div>
+
+            <div className="bg-muted rounded-lg p-3 max-h-48 overflow-y-auto space-y-1">
+              <p className="text-xs font-semibold text-muted-foreground mb-2">PREVIEW (First 5 records)</p>
+              {bulkData.slice(0, 5).map((s, i) => (
+                <div key={i} className="text-sm flex items-center justify-between">
+                  <span>{s.firstName} {s.lastName}</span>
+                  {s.phone && <span className="text-xs text-muted-foreground">{s.phone}</span>}
+                </div>
+              ))}
+              {bulkData.length > 5 && (
+                <p className="text-xs text-muted-foreground italic pt-2">...and {bulkData.length - 5} more.</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="secondary" onClick={() => setBulkImportOpen(false)} disabled={bulkSaving}>
+              Cancel
+            </Button>
+            <Button onClick={confirmBulkImport} disabled={bulkSaving}>
+              {bulkSaving ? (
+                <>
+                  <Spinner className="mr-2" />
+                  Importing...
+                </>
+              ) : (
+                "Confirm Import"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
