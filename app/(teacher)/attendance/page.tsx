@@ -1,6 +1,5 @@
-import TeacherAttendance from "@/components/modules/teacher-attendance"
+import TeacherDashboard from "@/components/modules/teacher-dashboard"
 
 export default function AttendancePage() {
-  return <TeacherAttendance />
+  return <TeacherDashboard />
 }
-

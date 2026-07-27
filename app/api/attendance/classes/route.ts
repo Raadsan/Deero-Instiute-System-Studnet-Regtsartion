@@ -9,7 +9,18 @@ export async function GET() {
 
   const classes = await prisma.class.findMany({
     where: { teacherId: session.userId, isActive: true },
-    select: { id: true, name: true, level: true, isActive: true, scheduleDays: true },
+    select: {
+      id: true,
+      name: true,
+      level: true,
+      isActive: true,
+      scheduleDays: true,
+      courses: {
+        where: { status: "ACTIVE" },
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      },
+    },
     orderBy: { name: "asc" },
   })
 
@@ -34,6 +45,7 @@ export async function GET() {
       isActive: Boolean(c.isActive),
       studentsCount: countMap.get(c.id) ?? 0,
       scheduleDays: c.scheduleDays ?? [],
+      courses: c.courses,
     })),
   )
 }

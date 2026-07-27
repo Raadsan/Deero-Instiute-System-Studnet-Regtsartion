@@ -62,6 +62,12 @@ const allMenuItems = [
   { href: "/audit", label: "Audit Log", icon: ClipboardList },
 ]
 
+const teacherMenuItems = [
+  { href: "/attendance", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/teacher-classes", label: "Classes", icon: School },
+  { href: "/attendance-report", label: "Attendance Report", icon: FileText },
+]
+
 function normalizeClientRole(role: unknown): AppRole | null {
   if (role === "Register") return "REGISTRAR"
   if (role === "ADMIN" || role === "TEACHER" || role === "REGISTRAR" || role === "FINANCE") return role
@@ -97,11 +103,13 @@ export default function Sidebar({
     })()
   }, [])
 
-  const menuItems = allowedRoutes
-    ? allMenuItems.filter((item) => allowedRoutes.includes(item.href))
-    : role === "ADMIN"
-      ? allMenuItems
-      : []
+  const menuItems = role === "TEACHER"
+    ? teacherMenuItems
+    : allowedRoutes
+      ? allMenuItems.filter((item) => allowedRoutes.includes(item.href))
+      : role === "ADMIN"
+        ? allMenuItems
+        : []
 
   return (
     <aside
@@ -148,6 +156,7 @@ export default function Sidebar({
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
         {menuItems.map((item) => {
           const Icon = item.icon
+          const label = item.label
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
 
           return (
@@ -161,12 +170,12 @@ export default function Sidebar({
                   ? "bg-sidebar-primary text-sidebar-primary-foreground"
                   : "text-sidebar-foreground hover:bg-sidebar-accent/80",
               )}
-              title={!isOpen ? item.label : undefined}
+              title={!isOpen ? label : undefined}
             >
               <Icon className="w-5 h-5 flex-shrink-0" />
               {isOpen && (
                 <>
-                  <span className="flex-1 text-left text-sm font-medium">{item.label}</span>
+                  <span className="flex-1 text-left text-sm font-medium">{label}</span>
                   {isActive && <ChevronRight className="w-4 h-4 opacity-80" />}
                 </>
               )}

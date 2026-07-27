@@ -21,7 +21,7 @@ const protectedRouteBases = [
   "/finance/student-fees", "/finance/teacher-payroll", "/finance/partners", "/finance/expenses",
   "/finance/audit", "/finance/reports", "/attendance-management", "/finance-users", "/dashboard",
   "/students", "/teachers", "/registrars", "/courses", "/classes", "/partners", "/contracts",
-  "/attendance", "/payments", "/audit", "/reports", "/messages", "/certificates", "/permissions", "/finance",
+  "/attendance", "/teacher-classes", "/attendance-report", "/payments", "/audit", "/reports", "/messages", "/certificates", "/permissions", "/finance",
 ]
 
 export async function middleware(req: NextRequest) {
@@ -51,7 +51,11 @@ export async function middleware(req: NextRequest) {
 
     const allowedRoutes = (payload.allowedRoutes as string[]) || [];
     const matchedRoute = protectedRouteBases.find((route) => matchesPathPrefix(pathname, route));
-    const isAllowed = matchedRoute ? allowedRoutes.includes(matchedRoute) : false;
+    const permissionRoute =
+      matchedRoute === "/teacher-classes" || matchedRoute === "/attendance-report"
+        ? "/attendance"
+        : matchedRoute;
+    const isAllowed = permissionRoute ? allowedRoutes.includes(permissionRoute) : false;
 
     if (!isAllowed) {
       // Redirect based on role defaults if they try to access an unauthorized route
@@ -96,6 +100,10 @@ export const config = {
     "/contracts/:path*",
     "/attendance",
     "/attendance/:path*",
+    "/teacher-classes",
+    "/teacher-classes/:path*",
+    "/attendance-report",
+    "/attendance-report/:path*",
     "/attendance-management",
     "/attendance-management/:path*",
     "/payments",

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Download, Users, CalendarCheck, History } from "lucide-react"
+import { Download, Users, CalendarCheck, FileBarChart, Search } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -30,7 +30,15 @@ type AttendanceRecordRow = {
   id: string
   status: "PRESENT" | "ABSENT"
   note: string | null
-  student: { id: string; firstName: string; lastName: string; email: string | null; phone: string | null } | null
+  student: {
+    id: string
+    firstName: string
+    lastName: string
+    email: string | null
+    phone: string | null
+    gender?: string | null
+    attendancePercentage?: number | null
+  } | null
   teacher: { id: string; name: string; email: string } | null
   createdAt: string | null
 }
@@ -42,12 +50,20 @@ type AttendanceRecordsResponse = {
   data: AttendanceRecordRow[]
 }
 
-type AttendanceHistoryResponse = {
-  class: { id: string; name: string }
-  students: Array<{ id: string; name: string }>
-  history: Record<string, Record<string, string>>
-  startDate: string
-  endDate: string
+type MonthlyReportResponse = {
+  month: string
+  class: { id: string; name: string; level: string | null }
+  teacher: string | null
+  courses: Array<{ id: string; name: string }>
+  students: Array<{
+    id: string
+    name: string
+    period: number
+    present: number
+    absent: number
+    percentage: number | null
+  }>
+  totals: { period: number; present: number; absent: number; percentage: number | null }
 }
 
 const ALL_CLASS_VALUE = "__all__"
@@ -84,12 +100,14 @@ export default function AttendanceView() {
 
   const [summary, setSummary] = useState<AttendanceSummaryResponse | null>(null)
   const [records, setRecords] = useState<AttendanceRecordsResponse | null>(null)
-  const [history, setHistory] = useState<AttendanceHistoryResponse | null>(null)
+  const [monthlyReport, setMonthlyReport] = useState<MonthlyReportResponse | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadingRecords, setLoadingRecords] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [downloading, setDownloading] = useState(false)
-  const [activeTab, setActiveTab] = useState<"daily" | "history">("daily")
+  const [activeTab, setActiveTab] = useState<"daily" | "monthly">("daily")
+  const [reportMonth, setReportMonth] = useState(() => formatDateInputValue(new Date()).slice(0, 7))
+  const [reportSearch, setReportSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("ALL")
   const [genderFilter, setGenderFilter] = useState<string>("ALL")
 
@@ -142,17 +160,19 @@ export default function AttendanceView() {
     }
   }
 
-  const loadHistory = async () => {
+  const loadMonthlyReport = async () => {
     if (!selectedClassId || selectedClassId === ALL_CLASS_VALUE) {
-      setHistory(null)
+      setMonthlyReport(null)
       return
     }
     setLoadingHistory(true)
     try {
-      const res = await api.get<AttendanceHistoryResponse>(`/api/attendance/history?classId=${selectedClassId}`)
-      setHistory(res.data)
+      const res = await api.get<MonthlyReportResponse>(
+        `/api/attendance/monthly-report?classId=${encodeURIComponent(selectedClassId)}&month=${encodeURIComponent(reportMonth)}`,
+      )
+      setMonthlyReport(res.data)
     } catch (e: any) {
-      toast({ title: "Failed to load history", description: getErrorMessage(e), variant: "destructive" })
+      toast({ title: "Failed to generate monthly report", description: getErrorMessage(e), variant: "destructive" })
     } finally {
       setLoadingHistory(false)
     }
@@ -162,9 +182,16 @@ export default function AttendanceView() {
     if (!date) return
     void loadSummary()
     void loadRecords()
-    if (activeTab === "history") void loadHistory()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, selectedClassId, activeTab])
+
+  const filteredMonthlyStudents = useMemo(() => {
+    const query = reportSearch.trim().toLowerCase()
+    if (!query) return monthlyReport?.students ?? []
+    return (monthlyReport?.students ?? []).filter(
+      (student) => student.name.toLowerCase().includes(query) || student.id.toLowerCase().includes(query),
+    )
+  }, [monthlyReport, reportSearch])
 
   const summaryRows = useMemo(() => summary?.data ?? [], [summary])
   const selectedClass = useMemo(
@@ -320,12 +347,12 @@ export default function AttendanceView() {
           Daily
         </Button>
         <Button
-          variant={activeTab === "history" ? "default" : "ghost"}
+          variant={activeTab === "monthly" ? "default" : "ghost"}
           className="rounded-full px-5 gap-2"
-          onClick={() => setActiveTab("history")}
+          onClick={() => setActiveTab("monthly")}
         >
-          <History className="w-4 h-4" />
-          History
+          <FileBarChart className="w-4 h-4" />
+          Monthly Report
         </Button>
       </div>
 
@@ -507,89 +534,89 @@ export default function AttendanceView() {
           </div>
         </>
       ) : (
-        <Card className="rounded-xl border border-muted/50 bg-card shadow-sm overflow-hidden">
-          <div className="p-4 sm:p-6 border-b bg-muted/20">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold tracking-tight flex items-center gap-2">
-                  <History className="w-5 h-5 text-primary" />
-                  30-Day History
-                </h3>
-                <p className="text-sm text-muted-foreground mt-1 capitalize">
-                  {selectedClass?.name ?? "Select a single class to view history"}
-                </p>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Present</span>
-                <span className="inline-flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Absent</span>
-                <span className="inline-flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-muted-foreground/30" /> None</span>
-              </div>
+        <div className="space-y-5">
+          <Card className="p-5 sm:p-6 border-muted/50 shadow-sm">
+            <div className="mb-5">
+              <h2 className="text-xl font-bold tracking-tight">Student Attendance Rate Report</h2>
+              <p className="text-sm text-muted-foreground mt-1">Choose a class and month, then generate a clear report for the teacher.</p>
             </div>
-          </div>
-          {loadingHistory ? (
-            <div className="p-12 flex justify-center text-muted-foreground"><Spinner /></div>
-          ) : !history || !history.students.length ? (
-            <div className="p-12 text-center text-muted-foreground text-sm border-dashed">Select a class to view history.</div>
-          ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="py-4 pl-6 sticky left-0 bg-background z-20 min-w-[200px] border-r">Student Name</TableHead>
-                    {(() => {
-                      const dates = []
-                      const curr = new Date(history.startDate)
-                      const end = new Date(history.endDate)
-                      while (curr <= end) {
-                        dates.push(curr.toISOString().split('T')[0])
-                        curr.setDate(curr.getDate() + 1)
-                      }
-                      return dates.reverse().map(d => (
-                        <TableHead key={d} className="text-center text-[10px] font-bold p-2 min-w-[45px] hover:bg-muted/50 transition-colors">
-                          {d.split('-').slice(1).reverse().join('/')}
-                        </TableHead>
-                      ))
-                    })()}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {history.students.map((s) => (
-                    <TableRow key={s.id} className="hover:bg-muted/30 transition-colors">
-                      <TableCell className="py-3 pl-6 sticky left-0 bg-background z-10 font-bold border-r text-sm truncate max-w-[200px]">
-                        {s.name}
-                      </TableCell>
-                      {(() => {
-                        const dates = []
-                        const curr = new Date(history.startDate)
-                        const end = new Date(history.endDate)
-                        while (curr <= end) {
-                          dates.push(curr.toISOString().split('T')[0])
-                          curr.setDate(curr.getDate() + 1)
-                        }
-                        return dates.reverse().map(d => {
-                          const status = history.history[s.id]?.[d]
-                          return (
-                            <TableCell key={d} className="p-0 text-center">
-                              <div className="flex items-center justify-center h-10 w-full group">
-                                {status === "PRESENT" ? (
-                                  <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]" title={`${d}: Present`} />
-                                ) : status === "ABSENT" ? (
-                                  <div className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]" title={`${d}: Absent`} />
-                                ) : (
-                                  <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/20" title={`${d}: No Record`} />
-                                )}
-                              </div>
-                            </TableCell>
-                          )
-                        })
-                      })()}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div className="space-y-2">
+                <Label>Class</Label>
+                <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                  <SelectTrigger className="h-11"><SelectValue placeholder="Select class" /></SelectTrigger>
+                  <SelectContent className={selectContentClass}>
+                    {classes.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="reportMonth">Month</Label>
+                <Input id="reportMonth" type="month" className="h-11" value={reportMonth} onChange={(event) => setReportMonth(event.target.value)} />
+              </div>
+              <Button className="h-11 gap-2" disabled={!selectedClassId || selectedClassId === ALL_CLASS_VALUE || !reportMonth || loadingHistory} onClick={() => void loadMonthlyReport()}>
+                {loadingHistory ? <Spinner className="w-4 h-4" /> : <FileBarChart className="w-4 h-4" />}
+                Generate Report
+              </Button>
+            </div>
+          </Card>
+
+          {monthlyReport && (
+            <Card className="rounded-xl border-muted/50 shadow-sm overflow-hidden">
+              <div className="p-5 sm:p-6 border-b bg-muted/20 space-y-4">
+                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                  <div>
+                    <h3 className="text-xl font-bold">Report Student Attendance Rate</h3>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {monthlyReport.courses.map((course) => course.name).join(", ") || "No course"} · {monthlyReport.class.name} · {new Date(`${monthlyReport.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                    </p>
+                    {monthlyReport.teacher && <p className="text-xs text-muted-foreground mt-1">Teacher: {monthlyReport.teacher}</p>}
+                  </div>
+                  <Badge variant="outline" className="w-fit py-2 px-3 text-sm">
+                    Overall: {monthlyReport.totals.percentage == null ? "No records" : `${monthlyReport.totals.percentage}%`}
+                  </Badge>
+                </div>
+                <div className="relative max-w-md">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input className="pl-9 bg-background" placeholder="Search student name or ID..." value={reportSearch} onChange={(event) => setReportSearch(event.target.value)} />
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="pl-6">ID</TableHead>
+                      <TableHead>Name</TableHead>
+                      <TableHead className="text-center">Period</TableHead>
+                      <TableHead className="text-center">Present</TableHead>
+                      <TableHead className="text-center">Absent</TableHead>
+                      <TableHead className="text-right pr-6">Percentage</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredMonthlyStudents.map((student) => (
+                      <TableRow key={student.id}>
+                        <TableCell className="pl-6 font-mono text-xs text-muted-foreground">{student.id}</TableCell>
+                        <TableCell className="font-semibold">{student.name}</TableCell>
+                        <TableCell className="text-center tabular-nums">{student.period}</TableCell>
+                        <TableCell className="text-center font-semibold text-emerald-700 tabular-nums">{student.present}</TableCell>
+                        <TableCell className="text-center font-semibold text-rose-700 tabular-nums">{student.absent}</TableCell>
+                        <TableCell className="text-right pr-6">
+                          <Badge variant="outline" className={student.percentage == null ? "text-muted-foreground" : student.percentage >= 80 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}>
+                            {student.percentage == null ? "No records" : `${student.percentage}%`}
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!filteredMonthlyStudents.length && (
+                      <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No students found.</TableCell></TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+            </Card>
           )}
-        </Card>
+        </div>
       )}
     </div>
   )

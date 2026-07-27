@@ -5,7 +5,7 @@ import { api } from "@/lib/api"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
-import { Users, GraduationCap, CalendarCheck, CalendarX2 } from "lucide-react"
+import { Users, GraduationCap, CalendarCheck, CalendarX2, FileBarChart, Search, ArrowLeft, ChevronRight } from "lucide-react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -30,11 +30,29 @@ type StudentRow = {
 
 type AttendanceStatus = "PRESENT" | "ABSENT"
 
+type MonthlyReport = {
+  month: string
+  class: { id: string; name: string; level: string | null }
+  teacher: string | null
+  courses: Array<{ id: string; name: string }>
+  students: Array<{
+    id: string
+    name: string
+    period: number
+    present: number
+    absent: number
+    percentage: number | null
+  }>
+  totals: { period: number; present: number; absent: number; percentage: number | null }
+}
+
 function getErrorMessage(error: any) {
   return error?.response?.data?.message ?? error?.message ?? "Something went wrong."
 }
 
 export default function TeacherAttendance() {
+  // Reports live on the dedicated /attendance-report page.
+  const showReport = false
   const [classes, setClasses] = useState<TeacherClass[]>([])
   const [selectedClassId, setSelectedClassId] = useState<string>("")
   const [date, setDate] = useState<string>(() => formatDateInputValue(new Date()))
@@ -45,6 +63,10 @@ export default function TeacherAttendance() {
   const [loadingClasses, setLoadingClasses] = useState(true)
   const [loadingStudents, setLoadingStudents] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [reportMonth, setReportMonth] = useState(() => formatDateInputValue(new Date()).slice(0, 7))
+  const [monthlyReport, setMonthlyReport] = useState<MonthlyReport | null>(null)
+  const [loadingReport, setLoadingReport] = useState(false)
+  const [reportSearch, setReportSearch] = useState("")
 
   const [statusFilter, setStatusFilter] = useState<string>("ALL")
   const [genderFilter, setGenderFilter] = useState<string>("ALL")
@@ -55,7 +77,10 @@ export default function TeacherAttendance() {
       try {
         const res = await api.get<TeacherClass[]>("/api/attendance/classes")
         setClasses(res.data)
-        if (res.data.length) setSelectedClassId((current) => current || res.data[0].id)
+        const requestedClassId = new URLSearchParams(window.location.search).get("classId")
+        if (requestedClassId && res.data.some((item) => item.id === requestedClassId)) {
+          setSelectedClassId(requestedClassId)
+        }
       } catch (e: any) {
         toast({ title: "Failed to load classes", description: getErrorMessage(e), variant: "destructive" })
       } finally {
@@ -191,6 +216,30 @@ export default function TeacherAttendance() {
     }
   }
 
+  const generateMonthlyReport = async () => {
+    if (!selectedClassId || !reportMonth) return
+    setLoadingReport(true)
+    try {
+      const response = await api.get<MonthlyReport>(
+        `/api/attendance/monthly-report?classId=${encodeURIComponent(selectedClassId)}&month=${encodeURIComponent(reportMonth)}`,
+      )
+      setMonthlyReport(response.data)
+    } catch (e: any) {
+      setMonthlyReport(null)
+      toast({ title: "Report failed", description: getErrorMessage(e), variant: "destructive" })
+    } finally {
+      setLoadingReport(false)
+    }
+  }
+
+  const reportStudents = useMemo(() => {
+    const query = reportSearch.trim().toLowerCase()
+    if (!query) return monthlyReport?.students ?? []
+    return (monthlyReport?.students ?? []).filter(
+      (student) => student.name.toLowerCase().includes(query) || student.id.toLowerCase().includes(query),
+    )
+  }, [monthlyReport, reportSearch])
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 space-y-6">
       <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
@@ -259,6 +308,140 @@ export default function TeacherAttendance() {
         </Card>
       )}
 
+      {!selectedClassId && classes.length > 0 && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-xl font-bold tracking-tight">My Classes</h2>
+            <p className="text-sm text-muted-foreground mt-1">Choose a class to view its students and take attendance.</p>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            {classes.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setSelectedClassId(item.id)}
+                className="group text-left rounded-2xl border bg-card p-5 shadow-sm transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-primary/30"
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <div className="rounded-xl bg-primary/10 p-3 text-primary">
+                    <GraduationCap className="h-6 w-6" />
+                  </div>
+                  <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+                </div>
+                <h3 className="mt-5 text-lg font-bold capitalize">{item.name}</h3>
+                <p className="mt-1 text-sm text-muted-foreground">{item.level ? `Level ${item.level}` : "Class"}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Badge variant="secondary">{item.studentsCount} students</Badge>
+                  <Badge variant="outline">{formatScheduleDays(item.scheduleDays ?? [])}</Badge>
+                </div>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {selectedClassId && selectedClass && (
+        <>
+          <div className="hidden">
+            <Button variant="ghost" className="w-fit gap-2 -ml-2" onClick={() => {
+              setSelectedClassId("")
+              setMonthlyReport(null)
+            }}>
+              <ArrowLeft className="h-4 w-4" />
+              Back to my classes
+            </Button>
+            <Badge variant="outline" className="w-fit py-1.5 px-3">
+              {selectedClass.name} · {selectedClass.studentsCount} students
+            </Badge>
+          </div>
+
+      {showReport && <Card className="overflow-hidden border-muted/50 shadow-sm">
+        <div className="p-5 sm:p-6 border-b bg-muted/20">
+          <div className="mb-5">
+            <h2 className="text-xl font-bold tracking-tight flex items-center gap-2">
+              <FileBarChart className="w-5 h-5 text-primary" />
+              Student Attendance Rate Report
+            </h2>
+            <p className="text-sm text-muted-foreground mt-1">Select your class and month to view a clear attendance report.</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
+            <div className="space-y-2">
+              <p className="text-sm font-medium">Month</p>
+              <input
+                type="month"
+                className="w-full h-11 px-4 py-2 border border-input rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+                value={reportMonth}
+                onChange={(event) => setReportMonth(event.target.value)}
+              />
+            </div>
+            <Button className="h-11 gap-2" onClick={() => void generateMonthlyReport()} disabled={!selectedClassId || !reportMonth || loadingReport}>
+              {loadingReport ? <Spinner className="w-4 h-4" /> : <FileBarChart className="w-4 h-4" />}
+              Generate Report
+            </Button>
+          </div>
+        </div>
+
+        {monthlyReport && (
+          <>
+            <div className="p-5 sm:p-6 border-b space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold">Report Student Attendance Rate</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {monthlyReport.courses.map((course) => course.name).join(", ") || "No course"} · {monthlyReport.class.name} · {new Date(`${monthlyReport.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
+                  </p>
+                </div>
+                <Badge variant="outline" className="w-fit py-2 px-3">
+                  Overall: {monthlyReport.totals.percentage == null ? "No records" : `${monthlyReport.totals.percentage}%`}
+                </Badge>
+              </div>
+              <div className="relative max-w-md">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <input
+                  className="w-full h-10 pl-9 pr-3 border border-input rounded-lg bg-background"
+                  placeholder="Search student name or ID..."
+                  value={reportSearch}
+                  onChange={(event) => setReportSearch(event.target.value)}
+                />
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader className="bg-muted/30">
+                  <TableRow>
+                    <TableHead className="pl-6">ID</TableHead>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="text-center">Period</TableHead>
+                    <TableHead className="text-center">Present</TableHead>
+                    <TableHead className="text-center">Absent</TableHead>
+                    <TableHead className="text-right pr-6">Percentage</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {reportStudents.map((student) => (
+                    <TableRow key={student.id}>
+                      <TableCell className="pl-6 font-mono text-xs text-muted-foreground">{student.id}</TableCell>
+                      <TableCell className="font-semibold whitespace-nowrap">{student.name}</TableCell>
+                      <TableCell className="text-center tabular-nums">{student.period}</TableCell>
+                      <TableCell className="text-center font-semibold text-emerald-700 tabular-nums">{student.present}</TableCell>
+                      <TableCell className="text-center font-semibold text-rose-700 tabular-nums">{student.absent}</TableCell>
+                      <TableCell className="text-right pr-6">
+                        <Badge variant="outline" className={student.percentage == null ? "text-muted-foreground" : student.percentage >= 80 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}>
+                          {student.percentage == null ? "No records" : `${student.percentage}%`}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!reportStudents.length && (
+                    <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No students found.</TableCell></TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        )}
+      </Card>}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-foreground">Mark Attendance</h2>
@@ -279,29 +462,7 @@ export default function TeacherAttendance() {
       </div>
 
       <Card className="p-4 sm:p-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="space-y-2">
-            <p className="text-sm font-medium">Class</p>
-            <Select value={selectedClassId} onValueChange={setSelectedClassId} disabled={loadingClasses}>
-              <SelectTrigger className="h-11">
-                <SelectValue placeholder={loadingClasses ? "Loading..." : "Select a class"} />
-              </SelectTrigger>
-              <SelectContent>
-                {classes.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {selectedClass && (
-              <p className="text-xs text-muted-foreground">
-                {selectedClass.level ? `${selectedClass.level} • ` : ""}
-                {selectedClass.studentsCount} students • Class days: {formatScheduleDays(selectedClass.scheduleDays ?? [])}
-              </p>
-            )}
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
             <p className="text-sm font-medium">Date</p>
             <input
@@ -528,7 +689,8 @@ export default function TeacherAttendance() {
           )}
         </Button>
       </div>
+        </>
+      )}
     </div>
   )
 }
-

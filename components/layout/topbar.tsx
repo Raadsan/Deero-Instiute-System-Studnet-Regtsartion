@@ -35,6 +35,8 @@ export default function TopBar({ menuOpen, onMenuClick, title, role }: TopBarPro
     if (title) return title
     if (pathname.startsWith("/classes")) return "Classes"
     if (pathname.startsWith("/attendance-management")) return "Attendance"
+    if (pathname.startsWith("/teacher-classes")) return "My Classes"
+    if (pathname.startsWith("/attendance-report")) return "Attendance Report"
     if (pathname.startsWith("/attendance")) return role === "TEACHER" ? "Teacher Dashboard" : "Attendance"
     if (pathname.startsWith("/permissions")) return "Roles & Permissions"
     if (pathname.startsWith("/registrars")) return "Registration Users"
@@ -49,6 +51,7 @@ export default function TopBar({ menuOpen, onMenuClick, title, role }: TopBarPro
     if (pathname.startsWith("/reports")) return "Reports"
     if (pathname.startsWith("/messages")) return "Messages"
     if (role === "REGISTRAR") return "Student Registration"
+    if (role === "TEACHER") return "Teacher Dashboard"
     return "Admin Dashboard"
   }, [pathname, title, role])
 
