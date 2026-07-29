@@ -2,11 +2,13 @@
 
 import { useMemo, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { Menu, Moon, Sun, Bell, Settings, User, X, KeyRound } from "lucide-react"
+import { Menu, Moon, Sun, Bell, Settings, X, KeyRound, UserRoundPen } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import type { AppRole } from "@/lib/auth"
 import ChangePasswordDialog from "@/components/auth/change-password-dialog"
+import ProfileDialog, { type ProfileUser } from "@/components/auth/profile-dialog"
+import { api } from "@/lib/api"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,8 +30,34 @@ export default function TopBar({ menuOpen, onMenuClick, title, role }: TopBarPro
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [profile, setProfile] = useState<ProfileUser | null>(null)
 
   useEffect(() => setMounted(true), [])
+  useEffect(() => {
+    let active = true
+    void api.get<ProfileUser>("/api/auth/me")
+      .then((response) => {
+        if (active) setProfile(response.data)
+      })
+      .catch(() => {
+        if (active) setProfile(null)
+      })
+    return () => {
+      active = false
+    }
+  }, [])
+
+  const initials = useMemo(
+    () =>
+      profile?.name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join("") || "U",
+    [profile?.name],
+  )
 
   const derivedTitle = useMemo(() => {
     if (title) return title
@@ -105,15 +133,33 @@ export default function TopBar({ menuOpen, onMenuClick, title, role }: TopBarPro
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="hidden sm:inline-flex p-2 hover:bg-muted rounded-lg transition-colors"
+              className="inline-flex items-center gap-2 rounded-lg p-1.5 hover:bg-muted transition-colors"
               aria-label="Account menu"
             >
-              <User className="w-5 h-5" />
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                {initials}
+              </span>
+              {profile?.name && (
+                <span className="hidden max-w-32 truncate text-left text-sm font-medium lg:block">
+                  {profile.name}
+                </span>
+              )}
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuLabel>Account</DropdownMenuLabel>
+            <DropdownMenuLabel className="space-y-1">
+              <span className="block truncate">{profile?.name ?? "Account"}</span>
+              {profile?.email && (
+                <span className="block truncate text-xs font-normal text-muted-foreground">
+                  {profile.email}
+                </span>
+              )}
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+              <UserRoundPen className="h-4 w-4" />
+              My Profile
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
               <KeyRound className="h-4 w-4" />
               Change Password
@@ -123,6 +169,12 @@ export default function TopBar({ menuOpen, onMenuClick, title, role }: TopBarPro
       </div>
 
       <ChangePasswordDialog open={changePasswordOpen} onOpenChange={setChangePasswordOpen} />
+      <ProfileDialog
+        open={profileOpen}
+        onOpenChange={setProfileOpen}
+        user={profile}
+        onUpdated={setProfile}
+      />
     </header>
   )
 }
