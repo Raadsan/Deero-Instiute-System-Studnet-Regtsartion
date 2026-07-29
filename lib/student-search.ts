@@ -6,6 +6,7 @@ export function buildStudentSearchFilter(search: string): Prisma.StudentWhereInp
 
   const parts = q.split(/\s+/).filter(Boolean)
   const or: Prisma.StudentWhereInput[] = [
+    { studentCode: { contains: q, mode: "insensitive" } },
     { firstName: { contains: q, mode: "insensitive" } },
     { lastName: { contains: q, mode: "insensitive" } },
     { email: { contains: q, mode: "insensitive" } },

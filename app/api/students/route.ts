@@ -6,10 +6,12 @@ import { sendVisitConfirmationWhatsApp } from "@/lib/visit-reminders";
 import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { buildStudentSearchFilter } from "@/lib/student-search";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { nextStudentCode } from "@/lib/student-code";
 
 function mapStudent(
   s: {
     id: string;
+    studentCode: string | null;
     firstName: string;
     lastName: string;
     phone: string | null;
@@ -35,6 +37,7 @@ function mapStudent(
   const registeredBy = registeredById ? registrarMap.get(registeredById) ?? null : null;
   return {
     id: s.id,
+    studentCode: s.studentCode,
     firstName: s.firstName,
     lastName: s.lastName,
     phone: s.phone ?? null,
@@ -173,9 +176,11 @@ export async function POST(req: Request) {
   const body = await req.json();
 
   const classId = (body.classId as string | null | undefined) ?? null;
+  let className: string | null = null;
   if (classId) {
-    const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true } });
+    const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true, name: true } });
     if (!cls) return NextResponse.json({ message: "Class not found" }, { status: 400 });
+    className = cls.name;
   }
 
   const paymentAmountRaw = body.paymentAmount
@@ -211,8 +216,10 @@ export async function POST(req: Request) {
   }
 
   const inserted = await prisma.$transaction(async (tx) => {
+    const studentCode = await nextStudentCode(tx, className)
     const student = await tx.student.create({
       data: {
+        studentCode,
         firstName: body.firstName,
         lastName: body.lastName,
         phone: phone ?? null,
@@ -270,6 +277,7 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       id: studentId,
+      studentCode: inserted.studentCode,
       ...body,
       enrollmentStatus: enrollment.data.enrollmentStatus,
       visitDate: enrollment.data.visitDate,
