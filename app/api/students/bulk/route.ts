@@ -45,6 +45,12 @@ export async function POST(req: Request) {
     const classIds = Array.from(
       new Set(normalizedStudents.map((student) => student.classId).filter((id): id is string => Boolean(id))),
     )
+    if (classIds.length !== 1) {
+      return NextResponse.json(
+        { message: "All students in one upload must be assigned to the same class." },
+        { status: 400 },
+      );
+    }
     const classes = classIds.length
       ? await prisma.class.findMany({
           where: { id: { in: classIds }, isActive: true },
