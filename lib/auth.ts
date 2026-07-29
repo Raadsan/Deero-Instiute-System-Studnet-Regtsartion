@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 import { jwtVerify } from "jose"
 import { prisma } from "@/lib/prisma"
 import { getCachedSession, setCachedSession } from "@/lib/session-cache"
+import { SESSION_TTL_SECONDS } from "@/lib/session-config"
 
 export type AppRole = "ADMIN" | "TEACHER" | "REGISTRAR" | "FINANCE"
 
@@ -43,7 +44,9 @@ export async function getSessionFromRequestCookies(): Promise<AppSession | null>
   if (!secret) return null
 
   try {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret))
+    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret), {
+      maxTokenAge: SESSION_TTL_SECONDS,
+    })
     const userId = typeof payload.sub === "string" ? payload.sub : null
     if (!userId) return null
 
