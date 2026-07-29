@@ -233,6 +233,7 @@ model PartnerPayout {
 
 model Student {
   id                  String           @id @default(cuid())
+  studentCode         String?          @unique
   firstName           String
   lastName            String
   phone               String?
