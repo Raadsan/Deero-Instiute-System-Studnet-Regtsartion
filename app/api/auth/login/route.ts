@@ -1,19 +1,23 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
-import { SignJWT } from "jose";
 import { prisma } from "@/lib/prisma";
 import { normalizeLoginEmail } from "@/lib/password-utils";
 import { normalizeRole } from "@/lib/auth";
 import { getAllowedRoutesForRole } from "@/lib/permissions";
-import { SESSION_TTL_SECONDS } from "@/lib/session-config";
+import { REFRESH_IDLE_TTL_SECONDS, REFRESH_SESSION_TTL_SECONDS } from "@/lib/session-config";
+import {
+  generateRefreshToken,
+  hashRefreshToken,
+  setAccessCookie,
+  setRefreshCookie,
+  signAccessToken,
+} from "@/lib/session-tokens";
 
 export async function POST(req: Request) {
   const jwtSecret = process.env.JWT_SECRET
   if (!jwtSecret) {
     return NextResponse.json({ message: "Server misconfigured" }, { status: 500 })
   }
-  const secret = new TextEncoder().encode(jwtSecret)
-
   let body: { email?: unknown; password?: unknown }
   try {
     body = await req.json()
@@ -53,12 +57,33 @@ export async function POST(req: Request) {
   if (!ok) return NextResponse.json({ message: "Invalid credentials" }, { status: 401 });
 
   const allowedRoutes = await getAllowedRoutesForRole(role);
-  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  const token = await new SignJWT({ sub: user.id, role, allowedRoutes })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime(expiresAt)
-    .sign(secret);
+  const accessToken = await signAccessToken({ userId: user.id, role, allowedRoutes })
+  const refreshToken = generateRefreshToken()
+  const now = new Date()
+  const refreshExpiresAt = new Date(now.getTime() + REFRESH_SESSION_TTL_SECONDS * 1000)
+  const idleExpiresAt = new Date(now.getTime() + REFRESH_IDLE_TTL_SECONDS * 1000)
+
+  await prisma.$transaction([
+    prisma.refreshSession.deleteMany({
+      where: {
+        userId: user.id,
+        OR: [
+          { expiresAt: { lte: now } },
+          { idleExpiresAt: { lte: now } },
+          { revokedAt: { not: null } },
+        ],
+      },
+    }),
+    prisma.refreshSession.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashRefreshToken(refreshToken),
+        expiresAt: refreshExpiresAt,
+        idleExpiresAt,
+        lastUsedAt: now,
+      },
+    }),
+  ])
 
   const res = NextResponse.json({
     id: user.id,
@@ -67,13 +92,8 @@ export async function POST(req: Request) {
     role,
   });
 
-  res.cookies.set("token", token, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: SESSION_TTL_SECONDS,
-  });
+  setAccessCookie(res, accessToken)
+  setRefreshCookie(res, refreshToken)
 
   return res;
 }

@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-import { SESSION_TTL_SECONDS } from "@/lib/session-config";
+import {
+  REFRESH_TOKEN_COOKIE,
+  SESSION_TTL_SECONDS,
+} from "@/lib/session-config";
 
 function getJwtSecret() {
   const value = process.env.JWT_SECRET
@@ -33,8 +36,17 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  const refreshOrLogin = () => {
+    if (req.cookies.get(REFRESH_TOKEN_COOKIE)?.value) {
+      const refreshUrl = new URL("/api/auth/refresh", req.url)
+      refreshUrl.searchParams.set("returnTo", `${pathname}${req.nextUrl.search}`)
+      return NextResponse.redirect(refreshUrl)
+    }
+    return NextResponse.redirect(new URL("/login", req.url))
+  }
+
   if (!token) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return refreshOrLogin();
   }
 
   const secret = getJwtSecret()
@@ -79,7 +91,7 @@ export async function middleware(req: NextRequest) {
 
     return NextResponse.next();
   } catch {
-    return NextResponse.redirect(new URL("/login", req.url));
+    return refreshOrLogin();
   }
 }
 

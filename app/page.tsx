@@ -4,6 +4,7 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import LoginPage from "@/components/auth/login-page"
 import { Spinner } from "@/components/ui/spinner"
+import { api } from "@/lib/api"
 
 export default function Home() {
   const router = useRouter()
@@ -13,13 +14,8 @@ export default function Home() {
   useEffect(() => {
     void (async () => {
       try {
-        const res = await fetch("/api/auth/me")
-        if (!res.ok) {
-          setShowLogin(true)
-          return
-        }
-
-        const data = (await res.json()) as { role?: string }
+        const res = await api.get<{ role?: string }>("/api/auth/me")
+        const data = res.data
         if (data.role === "TEACHER") router.replace("/attendance")
         else if (data.role === "REGISTRAR") router.replace("/students")
         else if (data.role === "FINANCE") router.replace("/finance")

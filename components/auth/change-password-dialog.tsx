@@ -45,9 +45,10 @@ export default function ChangePasswordDialog({ open, onOpenChange }: ChangePassw
         newPassword,
         confirmPassword,
       })
-      toast({ title: "Password changed", description: "Your password was updated successfully." })
+      toast({ title: "Password changed", description: "Sign in again with your new password." })
       resetForm()
       onOpenChange(false)
+      window.location.href = "/?password=changed"
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } }; message?: string }
       toast({
@@ -71,7 +72,9 @@ export default function ChangePasswordDialog({ open, onOpenChange }: ChangePassw
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Change Password</DialogTitle>
-          <DialogDescription>Update your account password. You will stay signed in.</DialogDescription>
+          <DialogDescription>
+            Update your account password. For security, all sessions will be signed out.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">

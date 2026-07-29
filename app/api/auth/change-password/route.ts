@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
 import { isPasswordValid } from "@/lib/password-utils"
+import { clearSessionCookies } from "@/lib/session-tokens"
 
 export async function POST(req: Request) {
   try {
@@ -54,8 +55,17 @@ export async function POST(req: Request) {
     })
 
     await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } })
+    await prisma.refreshSession.updateMany({
+      where: { userId: user.id, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
 
-    return NextResponse.json({ success: true, message: "Password changed successfully" })
+    const response = NextResponse.json({
+      success: true,
+      message: "Password changed successfully. Please sign in again.",
+    })
+    clearSessionCookies(response)
+    return response
   } catch (error) {
     console.error("[api/auth/change-password]", error)
     return NextResponse.json({ message: "Failed to change password" }, { status: 500 })

@@ -133,7 +133,7 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
               {/* Session notice & Submit */}
               <div className="space-y-6 pt-2">
                 <p className="text-sm text-muted-foreground">
-                  For your security, you will be signed out after 1 hour.
+                  Secure session: 8 hours maximum, with a 30-minute inactivity timeout.
                 </p>
 
                 <Button

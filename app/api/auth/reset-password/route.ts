@@ -46,6 +46,10 @@ export async function POST(req: Request) {
       prisma.passwordResetToken.deleteMany({
         where: { userId: record.userId, NOT: { id: record.id } },
       }),
+      prisma.refreshSession.updateMany({
+        where: { userId: record.userId, revokedAt: null },
+        data: { revokedAt: new Date() },
+      }),
     ])
 
     return NextResponse.json({
