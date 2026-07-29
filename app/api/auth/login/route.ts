@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { normalizeLoginEmail } from "@/lib/password-utils";
 import { normalizeRole } from "@/lib/auth";
 import { getAllowedRoutesForRole } from "@/lib/permissions";
+import { SESSION_TTL_SECONDS } from "@/lib/session-config";
 
 export async function POST(req: Request) {
   const jwtSecret = process.env.JWT_SECRET
@@ -52,10 +53,11 @@ export async function POST(req: Request) {
   if (!ok) return NextResponse.json({ message: "Invalid credentials" }, { status: 401 });
 
   const allowedRoutes = await getAllowedRoutesForRole(role);
+  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   const token = await new SignJWT({ sub: user.id, role, allowedRoutes })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("7d")
+    .setExpirationTime(expiresAt)
     .sign(secret);
 
   const res = NextResponse.json({
@@ -70,7 +72,7 @@ export async function POST(req: Request) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: SESSION_TTL_SECONDS,
   });
 
   return res;
