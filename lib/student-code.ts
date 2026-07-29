@@ -19,12 +19,15 @@ export async function nextStudentCode(
   className?: string | null,
 ) {
   const prefix = studentCodePrefix(className)
-  const latest = await tx.student.findFirst({
+  const existing = await tx.student.findMany({
     where: { studentCode: { startsWith: `${prefix}-` } },
     select: { studentCode: true },
-    orderBy: { studentCode: "desc" },
   })
 
-  const lastNumber = Number(latest?.studentCode?.split("-").at(-1)) || 0
+  const lastNumber = existing.reduce(
+    (highest, student) =>
+      Math.max(highest, Number(student.studentCode?.split("-").at(-1)) || 0),
+    0,
+  )
   return `${prefix}-${String(lastNumber + 1).padStart(3, "0")}`
 }
