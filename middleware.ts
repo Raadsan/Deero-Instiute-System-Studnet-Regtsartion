@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
+import { SESSION_TTL_SECONDS } from "@/lib/session-config";
 
 function getJwtSecret() {
   const value = process.env.JWT_SECRET
@@ -42,7 +43,9 @@ export async function middleware(req: NextRequest) {
   }
 
   try {
-    const { payload } = await jwtVerify(token, secret);
+    const { payload } = await jwtVerify(token, secret, {
+      maxTokenAge: SESSION_TTL_SECONDS,
+    });
     const role = normalizeRole(payload.role);
 
     if (!role) {
