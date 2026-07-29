@@ -33,9 +33,12 @@ export async function GET(req: NextRequest) {
   end.setHours(23, 59, 59, 999)
 
   const students = await prisma.student.findMany({
-    where: { classId },
-    select: { id: true, firstName: true, lastName: true },
+    where: { classId, isActive: true },
+    select: { id: true, studentCode: true, firstName: true, lastName: true },
   })
+  const publicCodeByInternalId = new Map(
+    students.map((student) => [student.id, student.studentCode ?? "UNASSIGNED"]),
+  )
 
   const records = await prisma.attendance.findMany({
     where: { classId, date: { gte: start, lte: end } },
@@ -45,7 +48,8 @@ export async function GET(req: NextRequest) {
   const historyMap: Record<string, Record<string, string>> = {}
 
   records.forEach((r) => {
-    const sId = r.studentId
+    const sId = publicCodeByInternalId.get(r.studentId)
+    if (!sId) return
     const dStr = r.date.toISOString().split("T")[0]
     if (!historyMap[sId]) historyMap[sId] = {}
     historyMap[sId][dStr] = r.status
@@ -54,7 +58,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     class: { id: classId, name: cls.name },
     students: students.map((s) => ({
-      id: s.id,
+      id: s.studentCode ?? "UNASSIGNED",
       name: `${s.firstName} ${s.lastName}`.trim(),
     })),
     history: historyMap,
