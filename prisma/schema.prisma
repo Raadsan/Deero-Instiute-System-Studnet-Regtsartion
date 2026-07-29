@@ -71,11 +71,30 @@ model User {
   recordedStaffPayouts     StaffSalaryPayout[]     @relation("StaffPayoutRecordedBy")
   recordedFinanceEntries   FinanceEntry[]          @relation("FinanceEntryRecordedBy")
   passwordResetTokens      PasswordResetToken[]
+  refreshSessions          RefreshSession[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([role, isActive])
+}
+
+model RefreshSession {
+  id            String    @id @default(cuid())
+  tokenHash     String    @unique
+  expiresAt     DateTime
+  idleExpiresAt DateTime
+  lastUsedAt    DateTime  @default(now())
+  revokedAt     DateTime?
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@index([idleExpiresAt])
 }
 
 model PasswordResetToken {

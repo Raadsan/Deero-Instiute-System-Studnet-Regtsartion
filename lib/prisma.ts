@@ -36,7 +36,8 @@ function isStalePrismaClient(client: PrismaClient) {
 
   const hasPasswordReset = "passwordResetToken" in client
   const hasAttendanceArchive = "attendanceArchive" in client
-  return !hasPasswordReset || !hasAttendanceArchive
+  const hasRefreshSessions = "refreshSession" in client
+  return !hasPasswordReset || !hasAttendanceArchive || !hasRefreshSessions
 }
 
 function getPrismaClient() {
