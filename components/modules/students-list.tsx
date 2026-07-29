@@ -556,69 +556,74 @@ export default function StudentsList() {
       try {
         const bstr = evt.target?.result
         const wb = XLSX.read(bstr, { type: "binary" })
-        const wsname = wb.SheetNames[0]
-        const ws = wb.Sheets[wsname]
-        // Read as 2D array to scan for headers on any row
-        const rawData: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1 })
-        
-        let headerRowIndex = -1
-        let nameColIndex = -1
-        let phoneColIndex = -1
+        const parsedStudents: Array<{ firstName: string; lastName: string; phone: string | null }> = []
 
-        // Find the header row
-        for (let i = 0; i < rawData.length; i++) {
-          const row = rawData[i]
-          if (!Array.isArray(row)) continue
-          
-          for (let j = 0; j < row.length; j++) {
-            const cellValue = normalizeImportHeader(row[j])
-            if (isStudentNameHeader(cellValue)) {
-              headerRowIndex = i
-              nameColIndex = j
+        for (const sheetName of wb.SheetNames) {
+          const rawData: unknown[][] = XLSX.utils.sheet_to_json(wb.Sheets[sheetName], { header: 1 })
+          let headerRowIndex = -1
+          let nameColIndex = -1
+          let phoneColIndex = -1
+
+          for (let i = 0; i < rawData.length; i++) {
+            const row = rawData[i]
+            if (!Array.isArray(row)) continue
+            for (let j = 0; j < row.length; j++) {
+              const cellValue = normalizeImportHeader(row[j])
+              if (isStudentNameHeader(cellValue)) {
+                headerRowIndex = i
+                nameColIndex = j
+              }
+              if (cellValue === "phone" || cellValue === "phone number" || cellValue === "mobile") {
+                phoneColIndex = j
+              }
             }
-            if (cellValue === "phone" || cellValue === "phone number" || cellValue === "mobile") {
-              phoneColIndex = j
-            }
+            if (headerRowIndex !== -1) break
           }
-          if (headerRowIndex !== -1) break
-        }
 
-        if (headerRowIndex === -1 || nameColIndex === -1) {
-          toast({ title: "No students found", description: "Use a name header such as 'Students Names', 'Student Name', or 'Name'.", variant: "destructive" })
-          return
-        }
+          const firstDataRow = headerRowIndex >= 0 ? headerRowIndex + 1 : 0
+          for (let i = firstDataRow; i < rawData.length; i++) {
+            const row = rawData[i]
+            if (!Array.isArray(row)) continue
 
-        const parsedStudents = []
-        
-        // Parse rows below the header
-        for (let i = headerRowIndex + 1; i < rawData.length; i++) {
-          const row = rawData[i]
-          if (!Array.isArray(row)) continue
-          
-          const parsedName = parseStudentFullName(row[nameColIndex])
-          if (!parsedName) continue // Skip empty rows
-          
-          const phone = phoneColIndex !== -1 ? String(row[phoneColIndex] || "").trim() : null
+            const rawName =
+              nameColIndex >= 0
+                ? row[nameColIndex]
+                : row
+                    .filter((cell) => {
+                      const value = String(cell ?? "").trim()
+                      return value && /[a-z]/i.test(value) && !value.includes("@") && !isStudentNameHeader(value)
+                    })
+                    .join(" ")
+            const parsedName = parseStudentFullName(rawName)
+            if (!parsedName) continue
 
-          parsedStudents.push({
-            ...parsedName,
-            phone: phone || null,
-          })
+            const phone = phoneColIndex >= 0 ? String(row[phoneColIndex] ?? "").trim() : null
+            parsedStudents.push({ ...parsedName, phone: phone || null })
+          }
         }
 
         if (parsedStudents.length === 0) {
-          toast({ title: "No students found", description: "Found the columns, but no student names below them.", variant: "destructive" })
+          toast({ title: "No students found", description: "The file does not contain readable student names.", variant: "destructive" })
           return
         }
 
+        const uniqueStudents = Array.from(
+          new Map(
+            parsedStudents.map((student) => [
+              `${student.firstName} ${student.lastName}`.trim().toLowerCase(),
+              student,
+            ]),
+          ).values(),
+        )
+
         // Sort A-Z by first name, then last name
-        parsedStudents.sort((a, b) => {
+        uniqueStudents.sort((a, b) => {
           const nameA = `${a.firstName} ${a.lastName}`.toLowerCase()
           const nameB = `${b.firstName} ${b.lastName}`.toLowerCase()
           return nameA.localeCompare(nameB)
         })
 
-        setBulkData(parsedStudents)
+        setBulkData(uniqueStudents)
         setBulkClassId(NO_CLASS_VALUE)
         setBulkImportOpen(true)
       } catch (error) {
@@ -1323,13 +1328,13 @@ export default function StudentsList() {
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>Assign to Class (Optional)</Label>
+              <Label>Assign to Class</Label>
               <Select value={bulkClassId} onValueChange={setBulkClassId}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="No Class" />
                 </SelectTrigger>
                 <SelectContent className={selectContentClass} position="popper">
-                  <SelectItem value={NO_CLASS_VALUE}>-- No Class --</SelectItem>
+                  <SelectItem value={NO_CLASS_VALUE}>-- Select Class --</SelectItem>
                   {classes.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.name}
@@ -1338,7 +1343,7 @@ export default function StudentsList() {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                If you select a class, all {bulkData.length} students will be added to it.
+                Select the class that all {bulkData.length} students belong to.
               </p>
             </div>
 
@@ -1359,7 +1364,7 @@ export default function StudentsList() {
             <Button variant="secondary" onClick={() => setBulkImportOpen(false)} disabled={bulkSaving}>
               Cancel
             </Button>
-            <Button onClick={confirmBulkImport} disabled={bulkSaving}>
+            <Button onClick={confirmBulkImport} disabled={bulkSaving || bulkClassId === NO_CLASS_VALUE}>
               {bulkSaving ? (
                 <>
                   <Spinner className="mr-2" />
