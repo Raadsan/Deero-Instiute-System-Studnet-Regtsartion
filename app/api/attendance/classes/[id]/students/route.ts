@@ -26,7 +26,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   const dateStr = searchParams.get("date")
 
   let isScheduledDay = false
-  let attendanceMap: Record<string, "PRESENT" | "ABSENT"> = {}
+  let attendanceRecords: Array<{ studentId: string; status: "PRESENT" | "ABSENT" }> = []
 
   if (dateStr) {
     const date = new Date(dateStr)
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
           select: { studentId: true, status: true },
         })
 
-        attendanceMap = Object.fromEntries(records.map((r) => [r.studentId, r.status as "PRESENT" | "ABSENT"]))
+        attendanceRecords = records
       }
     }
   }
@@ -63,6 +63,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     where: { classId, isActive: true },
     select: { 
       id: true, 
+      studentCode: true,
       firstName: true, 
       lastName: true,
       gender: true,
@@ -72,6 +73,15 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     },
     orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
   })
+  const publicCodeByInternalId = new Map(
+    students.map((student) => [student.id, student.studentCode ?? "UNASSIGNED"]),
+  )
+  const attendanceMap = Object.fromEntries(
+    attendanceRecords.map((record) => [
+      publicCodeByInternalId.get(record.studentId) ?? "UNASSIGNED",
+      record.status,
+    ]),
+  )
 
   return NextResponse.json({
     className: cls.name,
@@ -83,7 +93,8 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       const percentage = total > 0 ? Math.round((presentCount / total) * 100) : null
       
       return { 
-        id: s.id, 
+        id: s.studentCode ?? "UNASSIGNED",
+        studentCode: s.studentCode ?? "UNASSIGNED",
         firstName: s.firstName, 
         lastName: s.lastName,
         gender: s.gender,

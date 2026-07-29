@@ -44,17 +44,25 @@ export async function POST(req: Request) {
     )
   }
 
-  const studentIds = items.map((it) => it.studentId)
-  const uniqueStudentIds = Array.from(new Set(studentIds))
+  const studentCodes = items.map((it) => it.studentId)
+  const uniqueStudentCodes = Array.from(new Set(studentCodes))
 
   const students = await prisma.student.findMany({
-    where: { id: { in: uniqueStudentIds }, classId },
-    select: { id: true },
+    where: { studentCode: { in: uniqueStudentCodes }, classId },
+    select: { id: true, studentCode: true },
   })
 
-  if (students.length !== uniqueStudentIds.length) {
+  if (students.length !== uniqueStudentCodes.length) {
     return NextResponse.json({ message: "Some students do not belong to this class" }, { status: 400 })
   }
+  const internalIdByStudentCode = new Map(
+    students.map((student) => [student.studentCode, student.id]),
+  )
+  const resolvedItems = items.map((item) => ({
+    ...item,
+    studentId: internalIdByStudentCode.get(item.studentId)!,
+  }))
+  const uniqueStudentIds = students.map((student) => student.id)
 
   const dayStart = new Date(date)
   dayStart.setHours(0, 0, 0, 0)
@@ -69,7 +77,7 @@ export async function POST(req: Request) {
     },
   })
 
-  const docs = items.map((it) => ({
+  const docs = resolvedItems.map((it) => ({
     date: dayStart,
     classId,
     teacherId,
@@ -82,7 +90,7 @@ export async function POST(req: Request) {
 
   const channel = (process.env.NOTIFICATIONS_CHANNEL ?? "email").toLowerCase()
 
-  const absentStudentIds = Array.from(new Set(items.filter((x) => x.status === "ABSENT").map((x) => x.studentId)))
+  const absentStudentIds = Array.from(new Set(resolvedItems.filter((x) => x.status === "ABSENT").map((x) => x.studentId)))
   if (absentStudentIds.length) {
     const windowDays = 30
     const threshold = 3

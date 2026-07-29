@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
       courses: { where: { status: "ACTIVE" }, select: { id: true, name: true }, orderBy: { name: "asc" } },
       students: {
         where: { isActive: true },
-        select: { id: true, firstName: true, lastName: true },
+        select: { id: true, studentCode: true, firstName: true, lastName: true },
         orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       },
     },
@@ -70,7 +70,8 @@ export async function GET(req: NextRequest) {
     const count = counts.get(student.id) ?? { present: 0, absent: 0 }
     const period = count.present + count.absent
     return {
-      id: student.id,
+      id: student.studentCode ?? "UNASSIGNED",
+      studentCode: student.studentCode ?? "STU",
       name: `${student.firstName} ${student.lastName}`.trim(),
       period,
       present: count.present,
