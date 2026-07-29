@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react"
 import { Plus, Pencil, Trash2, Search, Users, CalendarClock, GraduationCap, Upload } from "lucide-react"
 import * as XLSX from "xlsx"
+import { isStudentNameHeader, normalizeImportHeader, parseStudentFullName } from "@/lib/student-import"
 
 import { api } from "@/lib/api"
 import { formatVisitDateInput, getNextSaturday } from "@/lib/visit-messages"
@@ -570,8 +571,8 @@ export default function StudentsList() {
           if (!Array.isArray(row)) continue
           
           for (let j = 0; j < row.length; j++) {
-            const cellValue = String(row[j] || "").trim().toLowerCase()
-            if (cellValue === "student name" || cellValue === "name") {
+            const cellValue = normalizeImportHeader(row[j])
+            if (isStudentNameHeader(cellValue)) {
               headerRowIndex = i
               nameColIndex = j
             }
@@ -583,7 +584,7 @@ export default function StudentsList() {
         }
 
         if (headerRowIndex === -1 || nameColIndex === -1) {
-          toast({ title: "No students found", description: "Could not find a 'Student name' column header in the file.", variant: "destructive" })
+          toast({ title: "No students found", description: "Use a name header such as 'Students Names', 'Student Name', or 'Name'.", variant: "destructive" })
           return
         }
 
@@ -594,22 +595,15 @@ export default function StudentsList() {
           const row = rawData[i]
           if (!Array.isArray(row)) continue
           
-          const rawName = String(row[nameColIndex] || "").trim()
-          if (!rawName) continue // Skip empty rows
-
-          const parts = rawName.split(" ").filter(Boolean)
-          const firstName = parts[0] || "Unknown"
-          const lastName = parts.slice(1).join(" ") || "Unknown"
+          const parsedName = parseStudentFullName(row[nameColIndex])
+          if (!parsedName) continue // Skip empty rows
           
           const phone = phoneColIndex !== -1 ? String(row[phoneColIndex] || "").trim() : null
 
-          if (firstName !== "Unknown" || lastName !== "Unknown") {
-            parsedStudents.push({
-              firstName,
-              lastName,
-              phone: phone || null,
-            })
-          }
+          parsedStudents.push({
+            ...parsedName,
+            phone: phone || null,
+          })
         }
 
         if (parsedStudents.length === 0) {
