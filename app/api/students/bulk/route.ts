@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canManageStudents, getSessionFromRequestCookies } from "@/lib/auth";
-import { nextStudentCode } from "@/lib/student-code";
+import { studentCodePrefix } from "@/lib/student-code";
 
 export async function POST(req: Request) {
   try {
@@ -42,6 +42,9 @@ export async function POST(req: Request) {
     if (normalizedStudents.some((student) => !student.firstName || !student.lastName)) {
       return NextResponse.json({ message: "Every row must contain a student name." }, { status: 400 });
     }
+    if (normalizedStudents.some((student) => !student.classId)) {
+      return NextResponse.json({ message: "Select a class before importing students." }, { status: 400 });
+    }
 
     const classIds = Array.from(
       new Set(normalizedStudents.map((student) => student.classId).filter((id): id is string => Boolean(id))),
@@ -57,28 +60,38 @@ export async function POST(req: Request) {
     }
     const classNameById = new Map(classes.map((item) => [item.id, item.name]))
 
-    const insertedCount = await prisma.$transaction(
-      async (tx) => {
-        let count = 0
-        for (const student of normalizedStudents) {
-          const className = student.classId ? classNameById.get(student.classId) : null
-          const studentCode = await nextStudentCode(tx, className)
-          await tx.student.create({
-            data: {
-              ...student,
-              studentCode,
-              isActive: true,
-              registeredById: session.userId,
-            },
-          })
-          count++
-        }
-        return count
-      },
-      { timeout: 30_000 },
-    );
+    const prefixes = Array.from(
+      new Set(
+        normalizedStudents.map((student) =>
+          studentCodePrefix(student.classId ? classNameById.get(student.classId) : null),
+        ),
+      ),
+    )
+    const existingCodes = await prisma.student.findMany({
+      where: { OR: prefixes.map((prefix) => ({ studentCode: { startsWith: `${prefix}-` } })) },
+      select: { studentCode: true },
+    })
+    const highestByPrefix = new Map(prefixes.map((prefix) => [prefix, 0]))
+    for (const student of existingCodes) {
+      const [prefix, sequence] = student.studentCode?.split("-") ?? []
+      if (!prefix) continue
+      highestByPrefix.set(prefix, Math.max(highestByPrefix.get(prefix) ?? 0, Number(sequence) || 0))
+    }
 
-    return NextResponse.json({ count: insertedCount }, { status: 201 });
+    const data = normalizedStudents.map((student) => {
+      const prefix = studentCodePrefix(student.classId ? classNameById.get(student.classId) : null)
+      const sequence = (highestByPrefix.get(prefix) ?? 0) + 1
+      highestByPrefix.set(prefix, sequence)
+      return {
+        ...student,
+        studentCode: `${prefix}-${String(sequence).padStart(3, "0")}`,
+        isActive: true,
+        registeredById: session.userId,
+      }
+    })
+    const inserted = await prisma.student.createMany({ data });
+
+    return NextResponse.json({ count: inserted.count }, { status: 201 });
   } catch (error) {
     console.error("Bulk upload error:", error);
     return NextResponse.json({ message: "Failed to upload students. Please check your data format." }, { status: 500 });
