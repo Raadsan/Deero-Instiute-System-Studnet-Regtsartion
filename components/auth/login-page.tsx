@@ -130,18 +130,11 @@ export default function LoginPage({ onLogin }: LoginPageProps) {
                 </div>
               </div>
 
-              {/* Remember Me & Submit */}
+              {/* Session notice & Submit */}
               <div className="space-y-6 pt-2">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="remember"
-                    className="w-4 h-4 rounded border-input text-primary focus:ring-primary/20 cursor-pointer accent-primary"
-                  />
-                  <Label htmlFor="remember" className="text-sm font-medium text-muted-foreground cursor-pointer select-none">
-                    Remember me for 30 days
-                  </Label>
-                </div>
+                <p className="text-sm text-muted-foreground">
+                  For your security, you will be signed out after 1 hour.
+                </p>
 
                 <Button
                   type="submit"
