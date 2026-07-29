@@ -19,10 +19,6 @@ export async function POST(req: Request) {
     if (studentsData.length === 0) {
       return NextResponse.json({ message: "No students provided." }, { status: 400 });
     }
-    if (studentsData.length > 250) {
-      return NextResponse.json({ message: "A maximum of 250 students can be uploaded at once." }, { status: 400 });
-    }
-
     const normalizedStudents = studentsData.map((value) => {
       const student =
         typeof value === "object" && value !== null
