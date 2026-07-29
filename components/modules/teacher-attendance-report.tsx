@@ -23,6 +23,7 @@ type Report = {
   courses: Array<{ id: string; name: string }>
   students: Array<{
     id: string
+    studentCode: string
     name: string
     period: number
     present: number
@@ -69,7 +70,7 @@ export default function TeacherAttendanceReport() {
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
     return (report?.students ?? []).filter(
-      (item) => !query || item.name.toLowerCase().includes(query) || item.id.toLowerCase().includes(query),
+      (item) => !query || item.name.toLowerCase().includes(query) || item.studentCode.toLowerCase().includes(query),
     )
   }, [report, search])
 
@@ -180,7 +181,7 @@ export default function TeacherAttendanceReport() {
                   <TableBody>
                     {rows.map((item) => (
                       <TableRow key={item.id} className="h-16">
-                        <TableCell className="pl-6 font-mono text-sm">{item.id}</TableCell>
+                        <TableCell className="pl-6 font-mono text-sm">{item.studentCode}</TableCell>
                         <TableCell className="font-medium whitespace-nowrap">{item.name}</TableCell>
                         <TableCell className="text-center tabular-nums">{item.period}</TableCell>
                         <TableCell className="text-center tabular-nums">{item.present}</TableCell>

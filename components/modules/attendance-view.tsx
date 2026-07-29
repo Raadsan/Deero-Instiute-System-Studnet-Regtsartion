@@ -32,6 +32,7 @@ type AttendanceRecordRow = {
   note: string | null
   student: {
     id: string
+    studentCode: string
     firstName: string
     lastName: string
     email: string | null
@@ -57,6 +58,7 @@ type MonthlyReportResponse = {
   courses: Array<{ id: string; name: string }>
   students: Array<{
     id: string
+    studentCode: string
     name: string
     period: number
     present: number
@@ -189,7 +191,7 @@ export default function AttendanceView() {
     const query = reportSearch.trim().toLowerCase()
     if (!query) return monthlyReport?.students ?? []
     return (monthlyReport?.students ?? []).filter(
-      (student) => student.name.toLowerCase().includes(query) || student.id.toLowerCase().includes(query),
+      (student) => student.name.toLowerCase().includes(query) || student.studentCode.toLowerCase().includes(query),
     )
   }, [monthlyReport, reportSearch])
 
@@ -596,7 +598,7 @@ export default function AttendanceView() {
                   <TableBody>
                     {filteredMonthlyStudents.map((student) => (
                       <TableRow key={student.id}>
-                        <TableCell className="pl-6 font-mono text-xs text-muted-foreground">{student.id}</TableCell>
+                        <TableCell className="pl-6 font-mono text-xs text-muted-foreground">{student.studentCode}</TableCell>
                         <TableCell className="font-semibold">{student.name}</TableCell>
                         <TableCell className="text-center tabular-nums">{student.period}</TableCell>
                         <TableCell className="text-center font-semibold text-emerald-700 tabular-nums">{student.present}</TableCell>
