@@ -576,30 +576,26 @@ export default function TeacherAttendance() {
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button
-                        variant={status === "PRESENT" ? "default" : "outline"}
-                        className={`h-12 rounded-xl border-2 transition-all active:scale-95 ${
-                          status === "PRESENT" 
-                            ? "border-primary shadow-md" 
-                            : "border-muted-foreground/10"
-                        }`}
-                        onClick={() => setStatusByStudentId((cur) => ({ ...cur, [s.id]: "PRESENT" }))}
-                      >
-                        <span className="font-bold">Present</span>
-                      </Button>
-                      <Button
-                        variant={status === "ABSENT" ? "destructive" : "outline"}
-                        className={`h-12 rounded-xl border-2 transition-all active:scale-95 ${
-                          status === "ABSENT" 
-                            ? "border-destructive shadow-md" 
-                            : "border-muted-foreground/10"
-                        }`}
-                        onClick={() => setStatusByStudentId((cur) => ({ ...cur, [s.id]: "ABSENT" }))}
-                      >
-                        <span className="font-bold">Absent</span>
-                      </Button>
-                    </div>
+                    <label
+                      className={`ml-auto flex h-10 w-10 cursor-pointer items-center justify-center rounded-lg border transition-colors ${
+                        status === "PRESENT"
+                          ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                          : "border-border bg-background text-muted-foreground"
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={status === "PRESENT"}
+                        onChange={(event) =>
+                          setStatusByStudentId((cur) => ({
+                            ...cur,
+                            [s.id]: event.target.checked ? "PRESENT" : "ABSENT",
+                          }))
+                        }
+                        aria-label={`Mark ${s.firstName} ${s.lastName} present`}
+                        className="h-5 w-5 rounded accent-emerald-600"
+                      />
+                    </label>
                   </div>
                 )
               })}
@@ -645,24 +641,26 @@ export default function TeacherAttendance() {
                           </Badge>
                         </TableCell>
                         <TableCell className="py-4 text-right pr-6">
-                          <div className="flex justify-end gap-2">
-                            <Button
-                              variant={status === "PRESENT" ? "default" : "secondary"}
-                              size="sm"
-                              className="w-24 shadow-sm"
-                              onClick={() => setStatusByStudentId((cur) => ({ ...cur, [s.id]: "PRESENT" }))}
-                            >
-                              Present
-                            </Button>
-                            <Button
-                              variant={status === "ABSENT" ? "destructive" : "secondary"}
-                              size="sm"
-                              className="w-24 shadow-sm"
-                              onClick={() => setStatusByStudentId((cur) => ({ ...cur, [s.id]: "ABSENT" }))}
-                            >
-                              Absent
-                            </Button>
-                          </div>
+                          <label
+                            className={`inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-lg border transition-colors ${
+                              status === "PRESENT"
+                                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                                : "border-border bg-background text-muted-foreground hover:bg-muted/40"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={status === "PRESENT"}
+                              onChange={(event) =>
+                                setStatusByStudentId((cur) => ({
+                                  ...cur,
+                                  [s.id]: event.target.checked ? "PRESENT" : "ABSENT",
+                                }))
+                              }
+                              aria-label={`Mark ${s.firstName} ${s.lastName} present`}
+                              className="h-5 w-5 rounded accent-emerald-600"
+                            />
+                          </label>
                         </TableCell>
                       </TableRow>
                     )
