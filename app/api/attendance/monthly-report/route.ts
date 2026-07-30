@@ -2,14 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 
 import { getSessionFromRequestCookies } from "@/lib/auth"
 import { prisma } from "@/lib/prisma"
-
-function getMonthRange(value: string | null) {
-  if (!value || !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return null
-  const [year, month] = value.split("-").map(Number)
-  const start = new Date(year, month - 1, 1, 0, 0, 0, 0)
-  const end = new Date(year, month, 1, 0, 0, 0, 0)
-  return { start, end }
-}
+import { parseInstituteMonth } from "@/lib/institute-date"
 
 function attendancePercentage(present: number, period: number) {
   if (period <= 0) return null
@@ -27,7 +20,7 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const classId = searchParams.get("classId")
   const month = searchParams.get("month")
-  const range = getMonthRange(month)
+  const range = parseInstituteMonth(month)
 
   if (!classId) return NextResponse.json({ message: "Class is required" }, { status: 400 })
   if (!range) return NextResponse.json({ message: "Select a valid month" }, { status: 400 })

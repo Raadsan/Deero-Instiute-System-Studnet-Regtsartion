@@ -24,17 +24,18 @@ export async function GET(req: Request) {
   if (paymentStatus && paymentStatus !== "PAID" && paymentStatus !== "UNPAID") {
     return NextResponse.json({ message: "Invalid paymentStatus" }, { status: 400 })
   }
+  const normalizedPaymentStatus = paymentStatus as "PAID" | "UNPAID" | null
 
   const studentWhere: Prisma.StudentWhereInput = { isActive: true }
   if (classId) studentWhere.classId = classId
-  if (paymentStatus) studentWhere.paymentStatus = paymentStatus
+  if (normalizedPaymentStatus) studentWhere.paymentStatus = normalizedPaymentStatus
 
   const paymentWhere: Prisma.PaymentWhereInput = {}
-  if (classId || paymentStatus) {
+  if (classId || normalizedPaymentStatus) {
     paymentWhere.student = {
       isActive: true,
       ...(classId ? { classId } : {}),
-      ...(paymentStatus ? { paymentStatus } : {}),
+      ...(normalizedPaymentStatus ? { paymentStatus: normalizedPaymentStatus } : {}),
     }
   }
 
@@ -42,7 +43,17 @@ export async function GET(req: Request) {
   const monthStart = startOfMonth(now)
   const nextMonthStart = addMonths(monthStart, 1)
 
-  const [classes, students, payments, paymentAggByStudent, totalAgg, monthlyAgg, paymentCount] = await Promise.all([
+  const [
+    classes,
+    students,
+    payments,
+    paymentAggByStudent,
+    totalAgg,
+    monthlyAgg,
+    paymentCount,
+    allStudentsForClassStats,
+    allPaymentsForClassStats,
+  ] = await Promise.all([
     prisma.class.findMany({
       where: { isActive: true },
       select: { id: true, name: true, level: true },
@@ -96,6 +107,18 @@ export async function GET(req: Request) {
       _sum: { amount: true },
     }),
     prisma.payment.count({ where: paymentWhere }),
+    prisma.student.groupBy({
+      by: ["classId", "paymentStatus"],
+      where: { isActive: true },
+      _count: { _all: true },
+    }),
+    prisma.$queryRaw<Array<{ classId: string | null; total: number; count: bigint }>>`
+      SELECT s."classId", COALESCE(SUM(p.amount), 0)::float AS total, COUNT(p.id) AS count
+      FROM "Payment" p
+      INNER JOIN "Student" s ON p."studentId" = s.id
+      WHERE s."isActive" = true
+      GROUP BY s."classId"
+    `,
   ])
 
   const studentPaymentMap = new Map(
@@ -108,20 +131,6 @@ export async function GET(req: Request) {
       },
     ]),
   )
-
-  const allStudentsForClassStats = await prisma.student.groupBy({
-    by: ["classId", "paymentStatus"],
-    where: { isActive: true },
-    _count: { _all: true },
-  })
-
-  const allPaymentsForClassStats = await prisma.$queryRaw<Array<{ classId: string | null; total: number; count: bigint }>>`
-    SELECT s."classId", COALESCE(SUM(p.amount), 0)::float AS total, COUNT(p.id) AS count
-    FROM "Payment" p
-    INNER JOIN "Student" s ON p."studentId" = s.id
-    WHERE s."isActive" = true
-    GROUP BY s."classId"
-  `
 
   const classNameMap = new Map(classes.map((c) => [c.id, c.name]))
   classNameMap.set("__none__", "No Class")

@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
-
-function parseDateRange(dateParam: string | null) {
-  const date = dateParam ? new Date(dateParam) : new Date()
-  if (Number.isNaN(date.getTime())) return null
-  const dayStart = new Date(date)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
-  return { dayStart, dayEnd }
-}
+import { formatInstituteDate, parseInstituteDay } from "@/lib/institute-date"
 
 export async function GET(req: NextRequest) {
   const session = await getSessionFromRequestCookies()
@@ -19,28 +10,35 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const classId = searchParams.get("classId")
-  if (!classId) return NextResponse.json({ message: "classId is required" }, { status: 400 })
 
-  const range = parseDateRange(searchParams.get("date"))
+  const range = parseInstituteDay(searchParams.get("date"))
   if (!range) return NextResponse.json({ message: "Invalid date" }, { status: 400 })
 
   const limit = Math.min(Math.max(Number(searchParams.get("limit") ?? "200"), 1), 1000)
 
-  const rows = await prisma.attendance.findMany({
-    where: { classId, date: { gte: range.dayStart, lt: range.dayEnd } },
-    select: { id: true, studentId: true, teacherId: true, status: true, note: true, date: true, createdAt: true },
-    take: limit,
-  })
+  const attendanceScope = classId ? { classId } : {}
+  const [rows, latestRecord] = await Promise.all([
+    prisma.attendance.findMany({
+      where: { ...attendanceScope, date: { gte: range.start, lt: range.end } },
+      select: { id: true, studentId: true, classId: true, teacherId: true, status: true, note: true, date: true, createdAt: true },
+      take: limit,
+    }),
+    prisma.attendance.findFirst({
+      where: attendanceScope,
+      orderBy: { date: "desc" },
+      select: { date: true },
+    }),
+  ])
 
-  const studentIds = Array.from(new Set(rows.map((r) => r.studentId)))
   const teacherIds = Array.from(new Set(rows.map((r) => r.teacherId).filter((id): id is string => Boolean(id))))
 
-  const [students, teachers, cls] = await Promise.all([
-    studentIds.length
-      ? prisma.student.findMany({
-          where: { id: { in: studentIds } },
+  const [students, teachers, classes] = await Promise.all([
+    prisma.student.findMany({
+          where: { isActive: true, ...(classId ? { classId } : { classId: { not: null } }) },
           select: { 
             id: true, 
+            classId: true,
+            studentCode: true,
             firstName: true, 
             lastName: true, 
             email: true, 
@@ -48,15 +46,18 @@ export async function GET(req: NextRequest) {
             gender: true,
             attendances: { select: { status: true } }
           },
-        })
-      : [],
+          orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
+        }),
     teacherIds.length
       ? prisma.user.findMany({
           where: { id: { in: teacherIds } },
           select: { id: true, name: true, email: true, role: true },
         })
       : [],
-    prisma.class.findUnique({ where: { id: classId }, select: { name: true, level: true } }),
+    prisma.class.findMany({
+      where: classId ? { id: classId } : { isActive: true },
+      select: { id: true, name: true, level: true },
+    }),
   ])
 
   const studentMap = new Map(
@@ -69,6 +70,7 @@ export async function GET(req: NextRequest) {
         s.id,
         {
           id: s.id,
+          studentCode: s.studentCode ?? "UNASSIGNED",
           firstName: s.firstName ?? "",
           lastName: s.lastName ?? "",
           email: s.email ?? null,
@@ -85,21 +87,27 @@ export async function GET(req: NextRequest) {
       .map((t) => [t.id, { id: t.id, name: t.name ?? "", email: t.email ?? "" }]),
   )
 
-  const classInfo = cls
-    ? { id: classId, name: cls.name ?? "", level: cls.level ?? null }
-    : { id: classId, name: classId, level: null }
+  const classMap = new Map(classes.map((cls) => [
+    cls.id,
+    { id: cls.id, name: cls.name ?? "", level: cls.level ?? null },
+  ]))
+  const selectedClass = classId ? classMap.get(classId) ?? { id: classId, name: classId, level: null } : null
 
-  const data = rows
-    .map((r) => {
-      const student = studentMap.get(r.studentId) ?? null
-      const teacher = r.teacherId ? teacherMap.get(r.teacherId) ?? null : null
+  const recordByStudentId = new Map(rows.map((row) => [row.studentId, row]))
+  const data = students
+    .filter((student) => student.classId && classMap.has(student.classId))
+    .map((studentRow) => {
+      const r = recordByStudentId.get(studentRow.id)
+      const student = studentMap.get(studentRow.id) ?? null
+      const teacher = r?.teacherId ? teacherMap.get(r.teacherId) ?? null : null
+      const rowClassId = studentRow.classId!
       return {
-        id: r.id,
-        class: classInfo,
-        date: r.date.toISOString(),
-        createdAt: r.createdAt?.toISOString() ?? null,
-        status: r.status ?? "ABSENT",
-        note: r.note ?? null,
+        id: r?.id ?? `unmarked-${studentRow.id}`,
+        class: classMap.get(rowClassId) ?? { id: rowClassId, name: rowClassId, level: null },
+        date: r?.date.toISOString() ?? null,
+        createdAt: r?.createdAt?.toISOString() ?? null,
+        status: r?.status ?? "NOT_MARKED",
+        note: r?.note ?? null,
         student,
         teacher,
       }
@@ -107,13 +115,16 @@ export async function GET(req: NextRequest) {
     .sort((a, b) => {
       const an = `${a.student?.lastName ?? ""} ${a.student?.firstName ?? ""}`.toLowerCase()
       const bn = `${b.student?.lastName ?? ""} ${b.student?.firstName ?? ""}`.toLowerCase()
-      return an.localeCompare(bn)
+      const classCompare = a.class.name.localeCompare(b.class.name)
+      return classCompare || an.localeCompare(bn)
     })
 
   return NextResponse.json({
-    date: range.dayStart.toISOString().slice(0, 10),
-    class: classInfo,
-    total: data.length,
+    date: formatInstituteDate(range.start),
+    class: selectedClass,
+    latestDate: latestRecord ? formatInstituteDate(latestRecord.date) : null,
+    total: rows.length,
+    rosterTotal: data.length,
     data,
   })
 }

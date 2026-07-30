@@ -66,8 +66,6 @@ type AdminReport = {
     teacherPayoutsThisMonth: number
     partnerPayoutsPeriod: number
     partnerPayoutsThisMonth: number
-    staffPayoutsPeriod: number
-    staffPayoutsThisMonth: number
     manualIncomePeriod: number
     manualExpensePeriod: number
     totalIncomePeriod: number
@@ -75,17 +73,8 @@ type AdminReport = {
     netBalancePeriod: number
     teacherBalanceDue: number
     partnerBalanceDue: number
-    staffBalanceDue: number
   }
   payroll: {
-    staff: Array<{
-      id: string
-      name: string
-      jobTitle: string | null
-      monthlySalary: number
-      totalPaidOut: number
-      balanceDue: number
-    }>
     teachers: Array<{
       id: string
       name: string
@@ -345,7 +334,7 @@ export default function ReportsView() {
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Reports & System Overview</h1>
             <p className="text-sm sm:text-base text-muted-foreground max-w-2xl">
-              Full school overview — students, attendance, all money (fees, teachers, partners, staff), unpaid students, visit scheduled, and every transaction.
+              Full school overview — students, attendance, fees, teachers, partners, unpaid students, visits, and transactions.
             </p>
           </div>
           <div className="flex w-full lg:w-auto flex-wrap gap-2 shrink-0">
@@ -584,7 +573,6 @@ export default function ReportsView() {
                     <div className="flex justify-between"><span>Student fees</span><span className="font-medium">{formatMoney(report.money.studentFeesPeriod)}</span></div>
                     <div className="flex justify-between"><span>Teacher payouts</span><span className="font-medium">{formatMoney(report.money.teacherPayoutsPeriod)}</span></div>
                     <div className="flex justify-between"><span>Partner payouts</span><span className="font-medium">{formatMoney(report.money.partnerPayoutsPeriod)}</span></div>
-                    <div className="flex justify-between"><span>Staff salaries</span><span className="font-medium">{formatMoney(report.money.staffPayoutsPeriod)}</span></div>
                     <div className="flex justify-between"><span>Manual income</span><span className="font-medium text-emerald-700">{formatMoney(report.money.manualIncomePeriod)}</span></div>
                     <div className="flex justify-between"><span>Manual expenses</span><span className="font-medium text-rose-700">{formatMoney(report.money.manualExpensePeriod)}</span></div>
                   </div>
@@ -596,19 +584,17 @@ export default function ReportsView() {
                     <div className="flex justify-between"><span>Student fees collected</span><span className="font-medium">{formatMoney(report.money.studentFeesThisMonth)}</span></div>
                     <div className="flex justify-between"><span>Teacher payouts</span><span className="font-medium">{formatMoney(report.money.teacherPayoutsThisMonth)}</span></div>
                     <div className="flex justify-between"><span>Partner payouts</span><span className="font-medium">{formatMoney(report.money.partnerPayoutsThisMonth)}</span></div>
-                    <div className="flex justify-between"><span>Staff salaries</span><span className="font-medium">{formatMoney(report.money.staffPayoutsThisMonth)}</span></div>
                   </div>
                   <div className="border-t pt-4 space-y-2 text-sm">
                     <div className="flex justify-between"><span>Outstanding — Teachers</span><span className="font-semibold">{formatMoney(report.money.teacherBalanceDue)}</span></div>
                     <div className="flex justify-between"><span>Outstanding — Partners</span><span className="font-semibold">{formatMoney(report.money.partnerBalanceDue)}</span></div>
-                    <div className="flex justify-between"><span>Outstanding — Staff</span><span className="font-semibold">{formatMoney(report.money.staffBalanceDue)}</span></div>
                   </div>
                 </Card>
               </div>
             </TabsContent>
 
             <TabsContent value="students" className="space-y-6">
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 gap-6">
                 <Card className="overflow-hidden">
                   <div className="px-6 py-4 border-b">
                     <h3 className="font-semibold">Unpaid Students ({report.unpaidStudents.length})</h3>
@@ -764,29 +750,6 @@ export default function ReportsView() {
                   </div>
                 </Card>
 
-                <Card className="overflow-hidden">
-                  <div className="px-6 py-4 border-b"><h3 className="font-semibold">Staff Salaries</h3></div>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Job</TableHead>
-                          <TableHead className="text-right">Balance</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {report.payroll.staff.map((row) => (
-                          <TableRow key={row.id}>
-                            <TableCell className="font-medium">{row.name}</TableCell>
-                            <TableCell>{row.jobTitle ?? "—"}</TableCell>
-                            <TableCell className="text-right">{formatMoney(row.balanceDue)}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </Card>
               </div>
             </TabsContent>
 

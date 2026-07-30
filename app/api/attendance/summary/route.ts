@@ -1,16 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
-
-function parseDateRange(dateParam: string | null) {
-  const date = dateParam ? new Date(dateParam) : new Date()
-  if (Number.isNaN(date.getTime())) return null
-  const dayStart = new Date(date)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
-  return { dayStart, dayEnd }
-}
+import { formatInstituteDate, parseInstituteDay } from "@/lib/institute-date"
 
 export async function GET(req: NextRequest) {
   const session = await getSessionFromRequestCookies()
@@ -19,16 +10,29 @@ export async function GET(req: NextRequest) {
 
   const { searchParams } = new URL(req.url)
   const classId = searchParams.get("classId")
-  const range = parseDateRange(searchParams.get("date"))
+  const range = parseInstituteDay(searchParams.get("date"))
   if (!range) return NextResponse.json({ message: "Invalid date" }, { status: 400 })
 
-  const records = await prisma.attendance.findMany({
-    where: {
-      date: { gte: range.dayStart, lt: range.dayEnd },
-      ...(classId ? { classId } : {}),
-    },
-    select: { classId: true, status: true, teacherId: true },
-  })
+  const [records, classes] = await Promise.all([
+    prisma.attendance.findMany({
+      where: {
+        date: { gte: range.start, lt: range.end },
+        ...(classId ? { classId } : {}),
+      },
+      select: { classId: true, status: true, teacherId: true },
+    }),
+    prisma.class.findMany({
+      where: { isActive: true, ...(classId ? { id: classId } : {}) },
+      select: {
+        id: true,
+        name: true,
+        level: true,
+        teacher: { select: { id: true, name: true, email: true } },
+        students: { where: { isActive: true }, select: { id: true } },
+      },
+      orderBy: { name: "asc" },
+    }),
+  ])
 
   const groupedMap = new Map<
     string,
@@ -49,56 +53,31 @@ export async function GET(req: NextRequest) {
     groupedMap.set(r.classId, entry)
   }
 
-  const classIds = Array.from(groupedMap.keys()).sort()
-  const teacherIdSet = new Set<string>()
-  for (const entry of groupedMap.values()) {
-    for (const tid of entry.teacherIds) teacherIdSet.add(tid)
-  }
-
-  const [classes, teachers] = await Promise.all([
-    classIds.length
-      ? prisma.class.findMany({
-          where: { id: { in: classIds } },
-          select: { id: true, name: true, level: true },
-        })
-      : [],
-    teacherIdSet.size
-      ? prisma.user.findMany({
-          where: { id: { in: Array.from(teacherIdSet) } },
-          select: { id: true, name: true, email: true, role: true },
-        })
-      : [],
-  ])
-
-  const classMap = new Map(
-    classes.map((c) => [c.id, { id: c.id, name: c.name ?? "", level: c.level ?? null }]),
-  )
-  const teacherMap = new Map(
-    teachers.filter((t) => t.role === "TEACHER").map((t) => [t.id, { id: t.id, name: t.name ?? "", email: t.email ?? "" }]),
-  )
-
-  const data = classIds.map((id) => {
-    const g = groupedMap.get(id)!
-    const total = g.total
+  const data = classes.map((cls) => {
+    const g = groupedMap.get(cls.id) ?? {
+      presentCount: 0,
+      absentCount: 0,
+      total: 0,
+      teacherIds: new Set<string>(),
+    }
+    const markedTotal = g.total
+    const total = cls.students.length
     const presentCount = g.presentCount
     const absentCount = g.absentCount
-    const percentage = total ? Math.round((presentCount / total) * 100) : 0
-    const classInfo = classMap.get(id) ?? { id, name: id, level: null }
-    const teacherList = Array.from(g.teacherIds)
-      .map((tid) => teacherMap.get(tid))
-      .filter((x): x is { id: string; name: string; email: string } => Boolean(x))
+    const percentage = markedTotal ? Math.round((presentCount / markedTotal) * 100) : 0
     return {
-      class: classInfo,
+      class: { id: cls.id, name: cls.name, level: cls.level },
       presentCount,
       absentCount,
       total,
+      unmarkedCount: Math.max(0, total - markedTotal),
       percentage,
-      teachers: teacherList,
+      teachers: cls.teacher ? [cls.teacher] : [],
     }
   })
 
   return NextResponse.json({
-    date: range.dayStart.toISOString().slice(0, 10),
+    date: formatInstituteDate(range.start),
     data,
   })
 }

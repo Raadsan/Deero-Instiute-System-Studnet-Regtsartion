@@ -22,7 +22,6 @@ import {
   ClipboardList,
   X,
   Shield,
-  CalendarClock,
 } from "lucide-react"
 import { api } from "@/lib/api"
 import type { AppRole } from "@/lib/auth"
@@ -46,7 +45,6 @@ const allMenuItems = [
   { href: "/classes", label: "Classes", icon: School },
   { href: "/partners", label: "Partners", icon: Handshake },
   { href: "/attendance-management", label: "Attendance", icon: Calendar },
-  { href: "/attendance", label: "Take Attendance", icon: CalendarClock },
   { href: "/contracts", label: "Contracts", icon: ScrollText },
   { href: "/finance", label: "Finance", icon: Wallet },
   { href: "/finance-users", label: "Finance Users", icon: UserPlus },

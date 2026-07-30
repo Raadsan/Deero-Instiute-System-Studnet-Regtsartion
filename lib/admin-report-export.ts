@@ -57,7 +57,6 @@ export function buildAdminReportCsv(report: AdminSystemReport) {
         ["Student Fees (Period)", cell(report.money.studentFeesPeriod), ""],
         ["Teacher Payouts (Period)", cell(report.money.teacherPayoutsPeriod), cell(report.money.teacherPayoutsThisMonth)],
         ["Partner Payouts (Period)", cell(report.money.partnerPayoutsPeriod), cell(report.money.partnerPayoutsThisMonth)],
-        ["Staff Payouts (Period)", cell(report.money.staffPayoutsPeriod), cell(report.money.staffPayoutsThisMonth)],
         ["Manual Income (Period)", cell(report.money.manualIncomePeriod), ""],
         ["Manual Expense (Period)", cell(report.money.manualExpensePeriod), ""],
         ["Total Income (Period)", cell(report.money.totalIncomePeriod), ""],
@@ -65,7 +64,6 @@ export function buildAdminReportCsv(report: AdminSystemReport) {
         ["Net Balance (Period)", cell(report.money.netBalancePeriod), ""],
         ["Teacher Balance Due", cell(report.money.teacherBalanceDue), ""],
         ["Partner Balance Due", cell(report.money.partnerBalanceDue), ""],
-        ["Staff Balance Due", cell(report.money.staffBalanceDue), ""],
       ],
     },
     {
@@ -121,19 +119,6 @@ export function buildAdminReportCsv(report: AdminSystemReport) {
       ],
     },
     {
-      title: "Staff Payroll",
-      rows: [
-        ["Name", "Job Title", "Monthly Salary", "Paid Out", "Balance Due"],
-        ...report.payroll.staff.map((row) => [
-          row.name,
-          row.jobTitle ?? "",
-          cell(row.monthlySalary),
-          cell(row.totalPaidOut),
-          cell(row.balanceDue),
-        ]),
-      ],
-    },
-    {
       title: "Financial Transactions",
       rows: [
         ["Date", "Category", "Name", "Description", "Type", "Amount"],
@@ -175,13 +160,11 @@ export async function buildAdminReportPdf(report: AdminSystemReport) {
       { label: "Student Fees (This Month)", value: formatMoney(report.money.studentFeesThisMonth), highlight: true },
       { label: "Teacher Payouts (Period)", value: formatMoney(report.money.teacherPayoutsPeriod) },
       { label: "Partner Payouts (Period)", value: formatMoney(report.money.partnerPayoutsPeriod) },
-      { label: "Staff Payouts (Period)", value: formatMoney(report.money.staffPayoutsPeriod) },
       { label: "Total Income (Period)", value: formatMoney(report.money.totalIncomePeriod), highlight: true },
       { label: "Total Expenses (Period)", value: formatMoney(report.money.totalExpensesPeriod), highlight: true },
       { label: "Net Balance (Period)", value: formatMoney(report.money.netBalancePeriod), highlight: true },
       { label: "Outstanding — Teachers", value: formatMoney(report.money.teacherBalanceDue) },
       { label: "Outstanding — Partners", value: formatMoney(report.money.partnerBalanceDue) },
-      { label: "Outstanding — Staff", value: formatMoney(report.money.staffBalanceDue) },
     ],
     columns: TX_COLUMNS,
     rows: tableRows,

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
-import { isClassScheduledOnDate } from "@/lib/class-schedule"
+import { getWeekdayFromDateInput } from "@/lib/class-schedule"
+import { parseInstituteDay } from "@/lib/institute-date"
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -29,18 +30,14 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   let attendanceRecords: Array<{ studentId: string; status: "PRESENT" | "ABSENT" }> = []
 
   if (dateStr) {
-    const date = new Date(dateStr)
-    if (!Number.isNaN(date.getTime())) {
-      isScheduledDay = isClassScheduledOnDate(scheduleDays, date)
+    const range = parseInstituteDay(dateStr)
+    const weekday = getWeekdayFromDateInput(dateStr)
+    if (range && weekday !== null) {
+      isScheduledDay = scheduleDays.includes(weekday)
 
       if (isScheduledDay) {
-        const dayStart = new Date(date)
-        dayStart.setHours(0, 0, 0, 0)
-        const dayEnd = new Date(dayStart)
-        dayEnd.setDate(dayEnd.getDate() + 1)
-
         const records = await prisma.attendance.findMany({
-          where: { classId, teacherId: session.userId, date: { gte: dayStart, lt: dayEnd } },
+          where: { classId, teacherId: session.userId, date: { gte: range.start, lt: range.end } },
           select: { studentId: true, status: true },
         })
 

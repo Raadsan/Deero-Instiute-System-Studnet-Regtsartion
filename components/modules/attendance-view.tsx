@@ -20,6 +20,7 @@ type AttendanceSummaryRow = {
   presentCount: number
   absentCount: number
   total: number
+  unmarkedCount: number
   percentage: number
   teachers: Array<{ id: string; name: string; email: string }>
 }
@@ -28,7 +29,8 @@ type AttendanceSummaryResponse = { date: string; data: AttendanceSummaryRow[] }
 
 type AttendanceRecordRow = {
   id: string
-  status: "PRESENT" | "ABSENT"
+  class: { id: string; name: string; level: string | null }
+  status: "PRESENT" | "ABSENT" | "NOT_MARKED"
   note: string | null
   student: {
     id: string
@@ -46,8 +48,10 @@ type AttendanceRecordRow = {
 
 type AttendanceRecordsResponse = {
   date: string
-  class: { id: string; name: string; level: string | null }
+  class: { id: string; name: string; level: string | null } | null
+  latestDate: string | null
   total: number
+  rosterTotal: number
   data: AttendanceRecordRow[]
 }
 
@@ -91,8 +95,10 @@ function formatPersonName(firstName: string, lastName: string) {
   return `${format(firstName)} ${format(lastName)}`.trim()
 }
 
-function statusLabel(status: "PRESENT" | "ABSENT") {
-  return status === "PRESENT" ? "Present" : "Absent"
+function statusLabel(status: AttendanceRecordRow["status"]) {
+  if (status === "PRESENT") return "Present"
+  if (status === "ABSENT") return "Absent"
+  return "Not marked"
 }
 
 export default function AttendanceView() {
@@ -114,12 +120,17 @@ export default function AttendanceView() {
   const [genderFilter, setGenderFilter] = useState<string>("ALL")
 
   useEffect(() => {
+    setStatusFilter("ALL")
+    setGenderFilter("ALL")
+  }, [selectedClassId])
+
+  useEffect(() => {
     const run = async () => {
       setLoading(true)
       try {
         const res = await api.get<ClassOption[]>("/api/classes")
         setClasses(res.data)
-        if (res.data.length) setSelectedClassId((cur) => cur || res.data[0].id)
+        if (res.data.length) setSelectedClassId((cur) => cur || ALL_CLASS_VALUE)
       } catch (e: any) {
         toast({ title: "Failed to load classes", description: getErrorMessage(e), variant: "destructive" })
       } finally {
@@ -144,16 +155,24 @@ export default function AttendanceView() {
   }
 
   const loadRecords = async () => {
-    if (!selectedClassId || selectedClassId === ALL_CLASS_VALUE) {
+    if (!selectedClassId) {
       setRecords(null)
       return
     }
     setLoadingRecords(true)
     try {
+      const classQuery = selectedClassId === ALL_CLASS_VALUE ? "" : `&classId=${encodeURIComponent(selectedClassId)}`
       const res = await api.get<AttendanceRecordsResponse>(
-        `/api/attendance/records?date=${encodeURIComponent(date)}&classId=${encodeURIComponent(selectedClassId)}&limit=1000`,
+        `/api/attendance/records?date=${encodeURIComponent(date)}${classQuery}&limit=1000`,
       )
       setRecords(res.data)
+      if (res.data.total === 0 && res.data.latestDate && res.data.latestDate !== date) {
+        setDate(res.data.latestDate)
+        toast({
+          title: "Showing latest attendance",
+          description: `No attendance was recorded on ${date}. Showing ${res.data.latestDate} instead.`,
+        })
+      }
     } catch (e: any) {
       toast({ title: "Failed to load records", description: getErrorMessage(e), variant: "destructive" })
       setRecords(null)
@@ -222,6 +241,7 @@ export default function AttendanceView() {
       // Status Filter
       if (statusFilter === "PRESENT" && r.status !== "PRESENT") return false
       if (statusFilter === "ABSENT" && r.status !== "ABSENT") return false
+      if (statusFilter === "NOT_MARKED" && r.status !== "NOT_MARKED") return false
       
       // Gender Filter
       const gender = (r.student?.gender || "UNKNOWN").toUpperCase()
@@ -233,27 +253,31 @@ export default function AttendanceView() {
   }, [records, statusFilter, genderFilter])
 
   const downloadCsv = async () => {
-    if (!selectedClassId || selectedClassId === ALL_CLASS_VALUE) return
+    if (!selectedClassId) return
     setDownloading(true)
     try {
       const data =
-        records && records.date === date && records.class.id === selectedClassId
+        records && records.date === date &&
+          (selectedClassId === ALL_CLASS_VALUE ? records.class === null : records.class?.id === selectedClassId)
           ? records
           : (await api.get<AttendanceRecordsResponse>(
-            `/api/attendance/records?date=${encodeURIComponent(date)}&classId=${encodeURIComponent(selectedClassId)}&limit=1000`,
+            `/api/attendance/records?date=${encodeURIComponent(date)}${selectedClassId === ALL_CLASS_VALUE ? "" : `&classId=${encodeURIComponent(selectedClassId)}`}&limit=1000`,
           )).data
       const lines = [
-        ["Date", "Class", "Student", "Status", "Teacher", "CreatedAt"].join(","),
+        ["Date", "Class", "Student ID", "Student", "Gender", "Status", "Teacher", "Note", "Created At"].join(","),
         ...data.data.map((r) => {
           const studentName = r.student ? `${r.student.firstName} ${r.student.lastName}`.trim() : ""
           const teacherName = r.teacher ? r.teacher.name : ""
           const createdAt = r.createdAt ? new Date(r.createdAt).toISOString() : ""
           return [
             data.date,
-            `"${data.class.name.replace(/"/g, '""')}"`,
+            `"${r.class.name.replace(/"/g, '""')}"`,
+            `"${(r.student?.studentCode ?? "").replace(/"/g, '""')}"`,
             `"${studentName.replace(/"/g, '""')}"`,
+            `"${(r.student?.gender ?? "").replace(/"/g, '""')}"`,
             r.status,
             `"${teacherName.replace(/"/g, '""')}"`,
+            `"${(r.note ?? "").replace(/"/g, '""')}"`,
             createdAt,
           ].join(",")
         }),
@@ -263,7 +287,7 @@ export default function AttendanceView() {
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
       a.href = url
-      a.download = `attendance-${data.class.name}-${data.date}.csv`.replace(/\s+/g, "-").toLowerCase()
+      a.download = `attendance-${data.class?.name ?? "all-classes"}-${data.date}.csv`.replace(/\s+/g, "-").toLowerCase()
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -301,7 +325,7 @@ export default function AttendanceView() {
           <Button
             className="w-full lg:w-auto rounded-full shadow-lg hover:shadow-primary/25 transition-all gap-2 px-6 shrink-0"
             onClick={downloadCsv}
-            disabled={!selectedClassId || selectedClassId === ALL_CLASS_VALUE || downloading || loading || loadingRecords}
+            disabled={!selectedClassId || downloading || loading || loadingRecords}
           >
             <Download className="w-4 h-4" /> {downloading ? "Preparing..." : "Export CSV"}
           </Button>
@@ -451,6 +475,7 @@ export default function AttendanceView() {
                        <SelectItem value="ALL">All Statuses</SelectItem>
                        <SelectItem value="PRESENT">Present</SelectItem>
                        <SelectItem value="ABSENT">Absent</SelectItem>
+                       <SelectItem value="NOT_MARKED">Not Marked</SelectItem>
                      </SelectContent>
                    </Select>
                  </div>
@@ -481,6 +506,7 @@ export default function AttendanceView() {
                   <TableHeader className="bg-muted/30">
                     <TableRow className="hover:bg-transparent">
                       <TableHead className="py-4 pl-6 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Student</TableHead>
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Class</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center w-[110px]">Status</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden md:table-cell">Teacher</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden md:table-cell text-right pr-6">Time</TableHead>
@@ -511,13 +537,16 @@ export default function AttendanceView() {
                             </div>
                           </div>
                         </TableCell>
+                        <TableCell className="py-4 text-sm font-medium text-foreground">{r.class.name}</TableCell>
                         <TableCell className="py-4 align-middle text-center">
                           <Badge
                             variant="secondary"
                             className={`inline-flex min-w-[80px] justify-center rounded-full shadow-none px-3 py-1 text-xs font-semibold ${
                               r.status === "PRESENT"
                                 ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : "bg-rose-50 text-rose-700 border border-rose-200"
+                                : r.status === "ABSENT"
+                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
+                                  : "bg-slate-50 text-slate-600 border border-slate-200"
                             }`}
                           >
                             {statusLabel(r.status)}
@@ -529,6 +558,13 @@ export default function AttendanceView() {
                         </TableCell>
                       </TableRow>
                     ))}
+                    {!filteredRecords.length && (
+                      <TableRow>
+                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                          No students match the selected filters.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </div>

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
-import { isClassScheduledOnDate } from "@/lib/class-schedule"
+import { getWeekdayFromDateInput } from "@/lib/class-schedule"
+import { parseInstituteDay } from "@/lib/institute-date"
 import { enqueueAndSendWhatsAppMessage, hasRecentAbsenceAlert } from "@/lib/whatsapp-queue"
 import { enqueueAndSendEmailMessage, hasRecentAbsenceEmailAlert } from "@/lib/email-queue"
 import { buildBroadcastEmailTemplate } from "@/lib/email-templates"
@@ -14,8 +15,9 @@ export async function POST(req: Request) {
 
   const body = await req.json()
 
-  const date = new Date(body.date)
-  if (Number.isNaN(date.getTime())) return NextResponse.json({ message: "Invalid date" }, { status: 400 })
+  const dateValue = typeof body.date === "string" ? body.date : null
+  const range = parseInstituteDay(dateValue)
+  if (!range) return NextResponse.json({ message: "Invalid date" }, { status: 400 })
 
   const classId = body.classId as string
   if (!classId) return NextResponse.json({ message: "classId is required" }, { status: 400 })
@@ -37,7 +39,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "You are not assigned to this class" }, { status: 403 })
   }
 
-  if (!isClassScheduledOnDate(cls.scheduleDays ?? [], date)) {
+  const weekday = dateValue ? getWeekdayFromDateInput(dateValue) : null
+  if (weekday === null || !(cls.scheduleDays ?? []).includes(weekday)) {
     return NextResponse.json(
       { message: "Attendance can only be recorded on scheduled class days" },
       { status: 400 },
@@ -64,10 +67,8 @@ export async function POST(req: Request) {
   }))
   const uniqueStudentIds = students.map((student) => student.id)
 
-  const dayStart = new Date(date)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
+  const dayStart = range.start
+  const dayEnd = range.end
 
   await prisma.attendance.deleteMany({
     where: {

@@ -100,8 +100,6 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
     teacherPayoutsThisMonth,
     partnerPayoutsPeriod,
     partnerPayoutsThisMonth,
-    staffPayoutsPeriod,
-    staffPayoutsThisMonth,
     manualIncomePeriod,
     manualExpensePeriod,
     unpaidStudentRows,
@@ -117,8 +115,6 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
     prisma.teacherContractPayout.aggregate({ where: { paidAt: monthFilter }, _sum: { amount: true } }),
     prisma.partnerPayout.aggregate({ where: { paidAt: dateFilter }, _sum: { amount: true } }),
     prisma.partnerPayout.aggregate({ where: { paidAt: monthFilter }, _sum: { amount: true } }),
-    prisma.staffSalaryPayout.aggregate({ where: { paidAt: dateFilter }, _sum: { amount: true } }),
-    prisma.staffSalaryPayout.aggregate({ where: { paidAt: monthFilter }, _sum: { amount: true } }),
     prisma.financeEntry.aggregate({ where: { type: "INCOME", occurredAt: dateFilter }, _sum: { amount: true } }),
     prisma.financeEntry.aggregate({ where: { type: "EXPENSE", occurredAt: dateFilter }, _sum: { amount: true } }),
     prisma.student.findMany({
@@ -161,28 +157,6 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
   const { weeklyAttendance, attendanceRate } = groupAttendanceByDay(attendancePeriodRows, now)
   const enrollmentTrends = groupEnrollmentsByMonth(enrollmentRows, addMonths(startOfMonth(now), -5))
 
-  const staffRows = await prisma.staff.findMany({
-    where: { isActive: true },
-    orderBy: { name: "asc" },
-  })
-  const staffPayoutsByStaff = await prisma.staffSalaryPayout.groupBy({
-    by: ["staffId"],
-    _sum: { amount: true },
-  })
-  const staffPaidMap = new Map(staffPayoutsByStaff.map((row) => [row.staffId, Number(row._sum.amount ?? 0)]))
-  const staffPayroll = staffRows.map((member) => {
-    const totalPaidOut = staffPaidMap.get(member.id) ?? 0
-    return {
-      id: member.id,
-      name: member.name,
-      jobTitle: member.jobTitle,
-      monthlySalary: member.monthlySalary,
-      totalPaidOut,
-      balanceDue: Math.max(0, member.monthlySalary - totalPaidOut),
-    }
-  })
-  const staffBalanceDue = staffPayroll.reduce((sum, row) => sum + row.balanceDue, 0)
-
   const classIds = Array.from(new Set(attendanceByClassRaw.map((r) => r.classId).filter(Boolean))) as string[]
   const classDocs = classIds.length
     ? await prisma.class.findMany({ where: { id: { in: classIds } }, select: { id: true, name: true } })
@@ -215,11 +189,10 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
   const studentFeesPeriodAmount = Number(studentFeesPeriod._sum.amount ?? 0)
   const teacherPeriod = Number(teacherPayoutsPeriod._sum.amount ?? 0)
   const partnerPeriod = Number(partnerPayoutsPeriod._sum.amount ?? 0)
-  const staffPeriod = Number(staffPayoutsPeriod._sum.amount ?? 0)
   const incomeManual = Number(manualIncomePeriod._sum.amount ?? 0)
   const expenseManual = Number(manualExpensePeriod._sum.amount ?? 0)
   const totalIncomePeriod = studentFeesPeriodAmount + incomeManual
-  const totalExpensesPeriod = teacherPeriod + partnerPeriod + staffPeriod + expenseManual
+  const totalExpensesPeriod = teacherPeriod + partnerPeriod + expenseManual
 
   return {
     range: {
@@ -247,8 +220,6 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
       teacherPayoutsThisMonth: Number(teacherPayoutsThisMonth._sum.amount ?? 0),
       partnerPayoutsPeriod: partnerPeriod,
       partnerPayoutsThisMonth: Number(partnerPayoutsThisMonth._sum.amount ?? 0),
-      staffPayoutsPeriod: staffPeriod,
-      staffPayoutsThisMonth: Number(staffPayoutsThisMonth._sum.amount ?? 0),
       manualIncomePeriod: incomeManual,
       manualExpensePeriod: expenseManual,
       totalIncomePeriod,
@@ -256,10 +227,8 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
       netBalancePeriod: totalIncomePeriod - totalExpensesPeriod,
       teacherBalanceDue: contractsOverview.totals.balanceDue,
       partnerBalanceDue: partnersOverview.balanceDue,
-      staffBalanceDue,
     },
     payroll: {
-      staff: staffPayroll,
       teachers: contractsOverview.teachers.map((t) => ({
         id: t.teacherId,
         name: t.teacherName,

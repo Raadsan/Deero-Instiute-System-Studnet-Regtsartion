@@ -76,11 +76,13 @@ export async function getFilteredFinanceReport(input: {
 
   const lines: ReportLine[] = []
 
-  if (category === "all" || category === "students" || category === "classes") {
-    const payments = await prisma.payment.findMany({
+  const [payments, partnerPayouts, teacherPayouts, staffPayouts, entries] = await Promise.all([
+    category === "all" || category === "students" || category === "classes"
+      ? prisma.payment.findMany({
       where: {
         paidAt: dateFilter,
         ...(category === "classes" && entityId ? { student: { classId: entityId } } : {}),
+        ...(category === "students" && entityId ? { studentId: entityId } : {}),
       },
       include: {
         student: {
@@ -96,111 +98,105 @@ export async function getFilteredFinanceReport(input: {
       orderBy: { paidAt: "desc" },
       take: 5000,
     })
-
-    for (const payment of payments) {
-      if (category === "students" && entityId && payment.studentId !== entityId) continue
-      lines.push({
-        date: payment.paidAt.toISOString(),
-        category: "Student Fee",
-        name: `${payment.student.firstName} ${payment.student.lastName}`,
-        description: payment.student.class?.name ?? "No class",
-        amount: payment.amount,
-        direction: "income",
-      })
-    }
-  }
-
-  if (category === "all" || category === "partners") {
-    const payouts = await prisma.partnerPayout.findMany({
-      where: {
-        paidAt: dateFilter,
-        ...(entityId && category === "partners" ? { partnerId: entityId } : {}),
-      },
-      include: { partner: { select: { id: true, name: true } } },
-      orderBy: { paidAt: "desc" },
-    })
-
-    for (const payout of payouts) {
-      lines.push({
-        date: payout.paidAt.toISOString(),
-        category: "Partner Payout",
-        name: payout.partner.name,
-        description: payout.period ?? payout.note ?? "Partner payment",
-        amount: payout.amount,
-        direction: "expense",
-      })
-    }
-  }
-
-  if (category === "all" || category === "teachers") {
-    const payouts = await prisma.teacherContractPayout.findMany({
-      where: {
-        paidAt: dateFilter,
-        ...(entityId && category === "teachers"
-          ? { contract: { teacherId: entityId } }
-          : {}),
-      },
-      include: {
-        contract: {
-          include: {
-            teacher: { select: { id: true, name: true } },
-            class: { select: { name: true } },
+      : Promise.resolve([]),
+    category === "all" || category === "partners"
+      ? prisma.partnerPayout.findMany({
+          where: {
+            paidAt: dateFilter,
+            ...(entityId && category === "partners" ? { partnerId: entityId } : {}),
           },
-        },
-      },
-      orderBy: { paidAt: "desc" },
-    })
+          include: { partner: { select: { id: true, name: true } } },
+          orderBy: { paidAt: "desc" },
+        })
+      : Promise.resolve([]),
+    category === "all" || category === "teachers"
+      ? prisma.teacherContractPayout.findMany({
+          where: {
+            paidAt: dateFilter,
+            ...(entityId && category === "teachers" ? { contract: { teacherId: entityId } } : {}),
+          },
+          include: {
+            contract: {
+              include: {
+                teacher: { select: { id: true, name: true } },
+                class: { select: { name: true } },
+              },
+            },
+          },
+          orderBy: { paidAt: "desc" },
+        })
+      : Promise.resolve([]),
+    category === "all" || category === "staff"
+      ? prisma.staffSalaryPayout.findMany({
+          where: {
+            paidAt: dateFilter,
+            ...(entityId && category === "staff" ? { staffId: entityId } : {}),
+          },
+          include: { staff: { select: { id: true, name: true } } },
+          orderBy: { paidAt: "desc" },
+        })
+      : Promise.resolve([]),
+    category === "all"
+      ? prisma.financeEntry.findMany({
+          where: { occurredAt: dateFilter },
+          orderBy: { occurredAt: "desc" },
+        })
+      : Promise.resolve([]),
+  ])
 
-    for (const payout of payouts) {
-      lines.push({
-        date: payout.paidAt.toISOString(),
-        category: "Teacher Payroll",
-        name: payout.contract.teacher.name,
-        description: payout.contract.class.name,
-        amount: payout.amount,
-        direction: "expense",
-      })
-    }
+  for (const payment of payments) {
+    lines.push({
+      date: payment.paidAt.toISOString(),
+      category: "Student Fee",
+      name: `${payment.student.firstName} ${payment.student.lastName}`,
+      description: payment.student.class?.name ?? "No class",
+      amount: payment.amount,
+      direction: "income",
+    })
   }
 
-  if (category === "all" || category === "staff") {
-    const payouts = await prisma.staffSalaryPayout.findMany({
-      where: {
-        paidAt: dateFilter,
-        ...(entityId && category === "staff" ? { staffId: entityId } : {}),
-      },
-      include: { staff: { select: { id: true, name: true } } },
-      orderBy: { paidAt: "desc" },
+  for (const payout of partnerPayouts) {
+    lines.push({
+      date: payout.paidAt.toISOString(),
+      category: "Partner Payout",
+      name: payout.partner.name,
+      description: payout.period ?? payout.note ?? "Partner payment",
+      amount: payout.amount,
+      direction: "expense",
     })
-
-    for (const payout of payouts) {
-      lines.push({
-        date: payout.paidAt.toISOString(),
-        category: "Staff Salary",
-        name: payout.staff.name,
-        description: payout.period ?? payout.note ?? "Staff salary",
-        amount: payout.amount,
-        direction: "expense",
-      })
-    }
   }
 
-  if (category === "all") {
-    const entries = await prisma.financeEntry.findMany({
-      where: { occurredAt: dateFilter },
-      orderBy: { occurredAt: "desc" },
+  for (const payout of teacherPayouts) {
+    lines.push({
+      date: payout.paidAt.toISOString(),
+      category: "Teacher Payroll",
+      name: payout.contract.teacher.name,
+      description: payout.contract.class.name,
+      amount: payout.amount,
+      direction: "expense",
     })
+  }
 
-    for (const entry of entries) {
-      lines.push({
-        date: entry.occurredAt.toISOString(),
-        category: entry.type === "INCOME" ? "Other Income" : "Other Expense",
-        name: entry.title,
-        description: entry.category ?? entry.note ?? "",
-        amount: entry.amount,
-        direction: entry.type === "INCOME" ? "income" : "expense",
-      })
-    }
+  for (const payout of staffPayouts) {
+    lines.push({
+      date: payout.paidAt.toISOString(),
+      category: "Staff Salary",
+      name: payout.staff.name,
+      description: payout.period ?? payout.note ?? "Staff salary",
+      amount: payout.amount,
+      direction: "expense",
+    })
+  }
+
+  for (const entry of entries) {
+    lines.push({
+      date: entry.occurredAt.toISOString(),
+      category: entry.type === "INCOME" ? "Other Income" : "Other Expense",
+      name: entry.title,
+      description: entry.category ?? entry.note ?? "",
+      amount: entry.amount,
+      direction: entry.type === "INCOME" ? "income" : "expense",
+    })
   }
 
   lines.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())

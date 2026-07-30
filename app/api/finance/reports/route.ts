@@ -6,6 +6,9 @@ import {
   getFinanceReportOptions,
 } from "@/lib/finance-report-service"
 import type { FinanceReportCategory } from "@/lib/finance-report-utils"
+import { getCachedReport } from "@/lib/report-cache"
+
+const FINANCE_REPORT_CACHE_MS = 30 * 1000
 
 function serverError(error: unknown) {
   console.error("[api/finance/reports]", error)
@@ -34,16 +37,21 @@ export async function GET(req: Request) {
 
     const { searchParams } = new URL(req.url)
     if (searchParams.get("options") === "true") {
-      const options = await getFinanceReportOptions(searchParams.get("search") ?? "")
+      const search = searchParams.get("search") ?? ""
+      const options = await getCachedReport(`finance-report-options:${search}`, FINANCE_REPORT_CACHE_MS, () =>
+        getFinanceReportOptions(search),
+      )
       return NextResponse.json(options)
     }
 
-    const report = await getFilteredFinanceReport({
+    const input = {
       period: searchParams.get("period"),
       month: searchParams.get("month"),
       category: parseCategory(searchParams.get("category")),
       entityId: searchParams.get("entityId"),
-    })
+    }
+    const cacheKey = `finance-report:${input.period ?? ""}:${input.month ?? ""}:${input.category}:${input.entityId ?? ""}`
+    const report = await getCachedReport(cacheKey, FINANCE_REPORT_CACHE_MS, () => getFilteredFinanceReport(input))
 
     return NextResponse.json(report)
   } catch (error) {
