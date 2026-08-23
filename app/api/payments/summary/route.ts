@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
 import { mapRecordedBy, recordedBySelect } from "@/lib/recorded-by"
 import { getStudentFeeBalances } from "@/lib/student-fees"
+import { formatPaymentReceiptNumber } from "@/lib/payment-receipt"
 import type { Prisma } from "@/lib/generated/prisma/client"
 
 function startOfMonth(date: Date) {
@@ -48,6 +49,7 @@ export async function GET(req: Request) {
     students,
     payments,
     paymentAggByStudent,
+    latestPayments,
     totalAgg,
     monthlyAgg,
     paymentCount,
@@ -77,6 +79,7 @@ export async function GET(req: Request) {
       where: paymentWhere,
       select: {
         id: true,
+        receiptNumber: true,
         amount: true,
         currency: true,
         paidAt: true,
@@ -102,6 +105,12 @@ export async function GET(req: Request) {
       _sum: { amount: true },
       _count: { _all: true },
       _max: { paidAt: true },
+    }),
+    prisma.payment.findMany({
+      where: paymentWhere,
+      select: { id: true, studentId: true },
+      orderBy: [{ studentId: "asc" }, { paidAt: "desc" }, { createdAt: "desc" }],
+      distinct: ["studentId"],
     }),
     prisma.payment.aggregate({ where: paymentWhere, _sum: { amount: true } }),
     prisma.payment.aggregate({
@@ -148,6 +157,7 @@ export async function GET(req: Request) {
       },
     ]),
   )
+  const latestPaymentMap = new Map(latestPayments.map((payment) => [payment.studentId, payment.id]))
 
   type ClassBucket = {
     classId: string | null
@@ -238,6 +248,7 @@ export async function GET(req: Request) {
       ...balances,
       paymentCount: stats?.paymentCount ?? 0,
       lastPaidAt: stats?.lastPaidAt ?? null,
+      lastPaymentId: latestPaymentMap.get(student.id) ?? null,
     }
   })
 
@@ -250,6 +261,7 @@ export async function GET(req: Request) {
 
   const recentPayments = payments.map((p) => ({
     id: p.id,
+    receiptNo: formatPaymentReceiptNumber(p.receiptNumber),
     amount: Number(p.amount ?? 0),
     currency: p.currency ?? "USD",
     paidAt: p.paidAt.toISOString(),

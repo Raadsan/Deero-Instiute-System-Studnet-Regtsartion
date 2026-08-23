@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 import {
   LayoutDashboard,
   Users,
@@ -10,6 +10,7 @@ import {
   DollarSign,
   FileText,
   School,
+  ChevronDown,
   ChevronRight,
   LogOut,
   Calendar,
@@ -26,6 +27,7 @@ import {
 import { api } from "@/lib/api"
 import type { AppRole } from "@/lib/auth"
 import { cn } from "@/lib/utils"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 interface SidebarProps {
   isOpen: boolean
@@ -66,6 +68,12 @@ const teacherMenuItems = [
   { href: "/attendance-report", label: "Attendance Report", icon: FileText },
 ]
 
+type TeacherSidebarClass = {
+  id: string
+  name: string
+  level: string | null
+}
+
 function normalizeClientRole(role: unknown): AppRole | null {
   if (role === "Register") return "REGISTRAR"
   if (role === "ADMIN" || role === "TEACHER" || role === "REGISTRAR" || role === "FINANCE") return role
@@ -81,8 +89,13 @@ export default function Sidebar({
   onClose,
 }: SidebarProps) {
   const pathname = usePathname()
+  const searchParams = useSearchParams()
   const [role, setRole] = useState<AppRole | null>(roleProp ?? null)
   const [allowedRoutes, setAllowedRoutes] = useState<string[] | null>(null)
+  const [teacherClasses, setTeacherClasses] = useState<TeacherSidebarClass[]>([])
+  const [classesLoading, setClassesLoading] = useState(false)
+  const [classesOpen, setClassesOpen] = useState(pathname.startsWith("/teacher-classes"))
+  const selectedClassId = searchParams.get("classId")
 
   useEffect(() => {
     setRole(roleProp ?? null)
@@ -100,6 +113,35 @@ export default function Sidebar({
       }
     })()
   }, [])
+
+  useEffect(() => {
+    if (pathname.startsWith("/teacher-classes")) setClassesOpen(true)
+  }, [pathname])
+
+  useEffect(() => {
+    if (role !== "TEACHER") {
+      setTeacherClasses([])
+      return
+    }
+
+    let cancelled = false
+    setClassesLoading(true)
+    void api
+      .get<TeacherSidebarClass[]>("/api/attendance/classes")
+      .then((response) => {
+        if (!cancelled) setTeacherClasses(response.data)
+      })
+      .catch(() => {
+        if (!cancelled) setTeacherClasses([])
+      })
+      .finally(() => {
+        if (!cancelled) setClassesLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [role])
 
   const menuItems = role === "TEACHER"
     ? teacherMenuItems
@@ -156,6 +198,85 @@ export default function Sidebar({
           const Icon = item.icon
           const label = item.label
           const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`)
+
+          if (role === "TEACHER" && item.href === "/teacher-classes") {
+            if (!isOpen) {
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={onNavigate}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-colors duration-200",
+                    isActive
+                      ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                      : "text-sidebar-foreground hover:bg-sidebar-accent/80",
+                  )}
+                  title={label}
+                >
+                  <Icon className="h-5 w-5 flex-shrink-0" />
+                </Link>
+              )
+            }
+
+            return (
+              <Collapsible key={item.href} open={classesOpen} onOpenChange={setClassesOpen}>
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center gap-3 rounded-lg px-3 py-2.5 transition-colors duration-200",
+                      isActive
+                        ? "bg-sidebar-primary text-sidebar-primary-foreground"
+                        : "text-sidebar-foreground hover:bg-sidebar-accent/80",
+                    )}
+                    aria-label="Toggle assigned classes"
+                  >
+                    <Icon className="h-5 w-5 flex-shrink-0" />
+                    <span className="flex-1 text-left text-sm font-medium">{label}</span>
+                    <ChevronDown
+                      className={cn("h-4 w-4 transition-transform duration-200", classesOpen && "rotate-180")}
+                    />
+                  </button>
+                </CollapsibleTrigger>
+
+                <CollapsibleContent>
+                  <div className="ml-5 mt-1 space-y-1 border-l border-sidebar-border pl-3">
+                    {classesLoading ? (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">Loading classes...</p>
+                    ) : teacherClasses.length ? (
+                      teacherClasses.map((teacherClass) => {
+                        const classActive = isActive && selectedClassId === teacherClass.id
+                        return (
+                          <Link
+                            key={teacherClass.id}
+                            href={`/teacher-classes?classId=${encodeURIComponent(teacherClass.id)}`}
+                            onClick={onNavigate}
+                            className={cn(
+                              "block rounded-md px-3 py-2 text-sm transition-colors",
+                              classActive
+                                ? "bg-sidebar-accent font-semibold text-sidebar-accent-foreground"
+                                : "text-sidebar-foreground/80 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground",
+                            )}
+                            title={teacherClass.name}
+                          >
+                            <span className="block truncate">{teacherClass.name}</span>
+                            {teacherClass.level && (
+                              <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+                                {teacherClass.level}
+                              </span>
+                            )}
+                          </Link>
+                        )
+                      })
+                    ) : (
+                      <p className="px-3 py-2 text-xs text-muted-foreground">No assigned classes</p>
+                    )}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )
+          }
 
           return (
             <Link

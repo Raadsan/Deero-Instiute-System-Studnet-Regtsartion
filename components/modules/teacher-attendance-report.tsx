@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Info, Search } from "lucide-react"
+import { CalendarDays, Info, Search } from "lucide-react"
 
 import { api } from "@/lib/api"
 import { Button } from "@/components/ui/button"
@@ -18,8 +18,10 @@ type TeacherClass = {
 }
 
 type Report = {
-  month: string
+  month: string | null
+  range: { from: string; to: string; label: string }
   class: { id: string; name: string }
+  teacher: string | null
   courses: Array<{ id: string; name: string }>
   students: Array<{
     id: string
@@ -30,7 +32,7 @@ type Report = {
     absent: number
     percentage: number | null
   }>
-  totals: { percentage: number | null }
+  totals: { period: number; present: number; absent: number; percentage: number | null }
 }
 
 function currentMonth() {
@@ -38,14 +40,35 @@ function currentMonth() {
   return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
 }
 
+function currentDate() {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    timeZone: "Africa/Nairobi",
+  }).format(new Date())
+}
+
+function formatReportDate(value: string) {
+  return new Date(`${value}T12:00:00`).toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  })
+}
+
 export default function TeacherAttendanceReport() {
   const [classes, setClasses] = useState<TeacherClass[]>([])
   const [classId, setClassId] = useState("")
   const [courseId, setCourseId] = useState("")
+  const [periodMode, setPeriodMode] = useState<"month" | "range">("range")
   const [month, setMonth] = useState(currentMonth)
+  const [fromDate, setFromDate] = useState(`${currentMonth()}-01`)
+  const [toDate, setToDate] = useState(currentDate)
   const [report, setReport] = useState<Report | null>(null)
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
+  const [error, setError] = useState<string | null>(null)
 
   const selectedClass = useMemo(() => classes.find((item) => item.id === classId) ?? null, [classes, classId])
   const courses = selectedClass?.courses ?? []
@@ -75,24 +98,41 @@ export default function TeacherAttendanceReport() {
   }, [report, search])
 
   const generate = async () => {
-    if (!classId || !month) return
+    if (!classId) return
+    if (periodMode === "month" && !month) return
+    if (periodMode === "range" && (!fromDate || !toDate)) return
+    if (periodMode === "range" && fromDate > toDate) {
+      setError("From date cannot be after To date.")
+      setReport(null)
+      return
+    }
     setLoading(true)
+    setError(null)
     try {
+      const periodQuery =
+        periodMode === "range"
+          ? `from=${encodeURIComponent(fromDate)}&to=${encodeURIComponent(toDate)}`
+          : `month=${encodeURIComponent(month)}`
       const response = await api.get<Report>(
-        `/api/attendance/monthly-report?classId=${encodeURIComponent(classId)}&month=${encodeURIComponent(month)}`,
+        `/api/attendance/monthly-report?classId=${encodeURIComponent(classId)}&${periodQuery}`,
       )
       setReport(response.data)
+    } catch (requestError: any) {
+      setReport(null)
+      setError(requestError?.response?.data?.message ?? requestError?.message ?? "Report could not be generated.")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    if (!classId || !month) return
+    if (!classId) return
+    if (periodMode === "month" && !month) return
+    if (periodMode === "range" && (!fromDate || !toDate || fromDate > toDate)) return
     void generate()
-    // Report refreshes automatically when the teacher changes class or month.
+    // Report refreshes automatically when the teacher changes class or period.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classId, month])
+  }, [classId, periodMode, month, fromDate, toDate])
 
   return (
     <div className="w-full p-4 sm:p-6 lg:p-8">
@@ -126,16 +166,85 @@ export default function TeacherAttendanceReport() {
             </div>
 
             <div className="space-y-2">
-              <p className="text-base font-semibold">Month</p>
-              <Input type="month" className="!h-14 w-full rounded-lg px-4 text-base shadow-sm" value={month} onChange={(event) => setMonth(event.target.value)} />
+              <p className="text-base font-semibold">Report Period</p>
+              <Select
+                value={periodMode}
+                onValueChange={(value) => {
+                  setPeriodMode(value as "month" | "range")
+                  setReport(null)
+                }}
+              >
+                <SelectTrigger className="!h-14 w-full rounded-lg px-4 text-base shadow-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="range">Custom Date Range</SelectItem>
+                  <SelectItem value="month">Monthly Report</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+          </div>
+
+          <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 sm:p-5">
+            <div className="mb-4 flex items-center gap-3">
+              <div className="rounded-lg bg-primary p-2 text-primary-foreground">
+                <CalendarDays className="h-4 w-4" />
+              </div>
+              <div>
+                <p className="font-semibold">{periodMode === "range" ? "Choose Date Range" : "Choose Month"}</p>
+                <p className="text-xs text-muted-foreground">
+                  {periodMode === "range"
+                    ? "Attendance from the first selected date through the last selected date."
+                    : "Generate the complete attendance report for one month."}
+                </p>
+              </div>
+            </div>
+
+            {periodMode === "range" ? (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">From Date</p>
+                  <Input
+                    type="date"
+                    className="!h-12 bg-background px-4"
+                    value={fromDate}
+                    max={toDate}
+                    onChange={(event) => setFromDate(event.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-sm font-semibold">To Date</p>
+                  <Input
+                    type="date"
+                    className="!h-12 bg-background px-4"
+                    value={toDate}
+                    min={fromDate}
+                    onChange={(event) => setToDate(event.target.value)}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-md space-y-2">
+                <p className="text-sm font-semibold">Month</p>
+                <Input
+                  type="month"
+                  className="!h-12 bg-background px-4"
+                  value={month}
+                  onChange={(event) => setMonth(event.target.value)}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex justify-center py-2">
             <Button
               className="h-12 min-w-44 rounded-full text-base"
               onClick={() => void generate()}
-              disabled={!classId || !month || loading}
+              disabled={
+                !classId ||
+                loading ||
+                (periodMode === "month" ? !month : !fromDate || !toDate || fromDate > toDate)
+              }
             >
               {loading ? <><Spinner className="mr-2" />Generating...</> : "Generate"}
             </Button>
@@ -156,14 +265,42 @@ export default function TeacherAttendanceReport() {
             </div>
           </div>
 
+          {error && (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              {error}
+            </div>
+          )}
+
           {report ? (
             <div className="pt-6">
               <div className="mb-6 text-center">
-                <h2 className="text-2xl font-bold sm:text-3xl">Report Student Attendance Rate</h2>
+                <h2 className="text-2xl font-bold sm:text-3xl">Teacher Attendance Report</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  {selectedCourse?.name ?? report.courses[0]?.name ?? "Course"} · {report.class.name} · {new Date(`${report.month}-01T00:00:00`).toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-                  {` · Overall ${report.totals.percentage ?? 0}%`}
+                  {selectedCourse?.name ?? report.courses[0]?.name ?? "Course"} · {report.class.name}
+                  {report.teacher ? ` · ${report.teacher}` : ""}
                 </p>
+                <p className="mt-1 text-sm font-medium text-primary">
+                  {formatReportDate(report.range.from)} – {formatReportDate(report.range.to)}
+                </p>
+              </div>
+
+              <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                <Card className="p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attendance Records</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums">{report.totals.period}</p>
+                </Card>
+                <Card className="border-emerald-200 bg-emerald-50/60 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Present</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-800">{report.totals.present}</p>
+                </Card>
+                <Card className="border-orange-200 bg-orange-50/60 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">Absent</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-orange-800">{report.totals.absent}</p>
+                </Card>
+                <Card className="border-blue-200 bg-blue-50/60 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Overall Rate</p>
+                  <p className="mt-1 text-2xl font-bold tabular-nums text-[#003D9E]">{report.totals.percentage ?? 0}%</p>
+                </Card>
               </div>
 
               <div className="overflow-x-auto rounded-lg border">
@@ -200,7 +337,7 @@ export default function TeacherAttendanceReport() {
             </div>
           ) : (
             <div className="py-10 text-center text-sm text-muted-foreground">
-              Select a class and month, then click Generate to view the report.
+              Select a class and report period, then click Generate to view the report.
             </div>
           )}
         </div>

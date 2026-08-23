@@ -30,9 +30,12 @@ export async function POST(req: NextRequest) {
   if (typeof courseId === "string" && courseId) {
     const course = await prisma.course.findUnique({
       where: { id: courseId },
-      select: { classId: true, name: true },
+      select: { classId: true, name: true, status: true },
     })
     if (!course) return NextResponse.json({ message: "Course not found" }, { status: 404 })
+    if (course.status !== "ACTIVE") {
+      return NextResponse.json({ message: "Only active courses can receive broadcasts" }, { status: 400 })
+    }
     resolvedCourseId = courseId
     resolvedClassId = course.classId ?? null
     contextSubtitle = course.name ? `Course: ${course.name}` : "Course announcement"

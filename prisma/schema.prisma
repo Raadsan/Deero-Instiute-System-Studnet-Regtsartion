@@ -349,11 +349,16 @@ model AttendanceArchive {
 }
 
 model Payment {
-  id       String   @id @default(cuid())
-  amount   Float
-  currency String   @default("USD")
-  paidAt   DateTime @default(now())
-  note     String?
+  id                 String        @id @default(cuid())
+  receiptNumber      Int           @unique @default(autoincrement())
+  amount             Float
+  currency           String        @default("USD")
+  paidAt             DateTime      @default(now())
+  note               String?
+  feeAmountSnapshot  Float         @default(0)
+  totalPaidSnapshot  Float         @default(0)
+  balanceSnapshot    Float         @default(0)
+  statusSnapshot     PaymentStatus @default(UNPAID)
 
   studentId String
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)

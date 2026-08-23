@@ -486,8 +486,8 @@ export default function ClassesPage() {
                   <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Shift</TableHead>
                   <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Class Days</TableHead>
                   <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Teacher</TableHead>
-                  <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden md:table-cell text-right whitespace-nowrap">Students</TableHead>
-                  <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Status</TableHead>
+                  <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden md:table-cell text-center whitespace-nowrap">Students</TableHead>
+                  <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap text-center">Status</TableHead>
                   <TableHead className="text-right pr-6 font-semibold text-xs uppercase tracking-wider text-muted-foreground whitespace-nowrap">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -522,8 +522,8 @@ export default function ClassesPage() {
                     <TableCell className="py-4 text-sm font-medium align-middle">
                       {cls.teacher?.name ?? <span className="text-muted-foreground italic font-normal">Unassigned</span>}
                     </TableCell>
-                    <TableCell className="hidden md:table-cell text-right py-4 tabular-nums">
-                      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-muted/50 border border-muted">
+                    <TableCell className="hidden md:table-cell text-center py-4 tabular-nums">
+                      <div className="inline-flex items-center justify-center gap-1.5 px-3 py-1 rounded-full bg-muted/50 border border-muted text-xs font-semibold min-w-[88px]">
                         <span className="w-1.5 h-1.5 rounded-full bg-primary/60"></span>
                         {cls.studentsCount ?? 0}
                       </div>

@@ -86,8 +86,8 @@ export default function MessagesCenter() {
     if (loadMode === "refresh") setReloading(true)
     try {
       const [classesRes, coursesRes, studentsRes] = await Promise.all([
-        api.get<ClassOption[]>("/api/classes"),
-        api.get<any[]>("/api/courses"),
+        api.get<ClassOption[]>("/api/classes?assignmentEligible=true"),
+        api.get<any[]>("/api/courses?status=ACTIVE"),
         api.get<{ items: StudentOption[] }>("/api/students?page=1&pageSize=100&isActive=true"),
       ])
 

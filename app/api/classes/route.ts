@@ -55,14 +55,25 @@ function mapClassRow(
 }
 
 // GET /api/classes
-export async function GET() {
+export async function GET(req: Request) {
   const session = await getSessionFromRequestCookies();
   if (!session) return NextResponse.json({ message: "Unauthorized" }, { status: 401 });
   if (session.role !== "ADMIN" && session.role !== "REGISTRAR" && session.role !== "FINANCE") {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
-  const classes = await prisma.class.findMany({ orderBy: { createdAt: "desc" } });
+  const { searchParams } = new URL(req.url);
+  const assignmentEligible = searchParams.get("assignmentEligible") === "true";
+
+  const classes = await prisma.class.findMany({
+    where: assignmentEligible
+      ? {
+          isActive: true,
+          courses: { some: { status: { in: ["ACTIVE", "SCHEDULED"] } } },
+        }
+      : undefined,
+    orderBy: { createdAt: "desc" },
+  });
 
   const classIds = classes.map((c) => c.id);
 

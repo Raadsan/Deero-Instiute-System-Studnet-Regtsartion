@@ -153,6 +153,14 @@ export async function POST(req: Request) {
   }
 
   const inserted = await prisma.$transaction(async (tx) => {
+    const paymentTotalBefore = await tx.payment.aggregate({
+      where: { studentId },
+      _sum: { amount: true },
+    })
+    const totalPaid = roundMoney(Number(paymentTotalBefore._sum.amount ?? 0) + numericAmount)
+    const paymentStatus = getStudentPaymentStatus(accountFeeAmount, totalPaid)
+    const balances = getStudentFeeBalances(accountFeeAmount, totalPaid)
+
     const payment = await tx.payment.create({
       data: {
         studentId,
@@ -161,15 +169,12 @@ export async function POST(req: Request) {
         note: paymentNote,
         paidAt: parsedPaidAt,
         recordedById: auth.session.userId,
+        feeAmountSnapshot: accountFeeAmount,
+        totalPaidSnapshot: totalPaid,
+        balanceSnapshot: balances.remainingBalance,
+        statusSnapshot: paymentStatus,
       },
     })
-
-    const paymentTotal = await tx.payment.aggregate({
-      where: { studentId },
-      _sum: { amount: true },
-    })
-    const totalPaid = roundMoney(Number(paymentTotal._sum.amount ?? 0))
-    const paymentStatus = getStudentPaymentStatus(accountFeeAmount, totalPaid)
 
     await tx.student.update({
       where: { id: studentId },

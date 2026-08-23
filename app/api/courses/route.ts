@@ -19,10 +19,14 @@ export async function GET(req: NextRequest) {
   const teacherId = searchParams.get("teacherId")
   const status = searchParams.get("status")
 
+  if (status && !isCourseStatus(status)) {
+    return NextResponse.json({ message: "Invalid status" }, { status: 400 })
+  }
+
   const where: Prisma.CourseWhereInput = {}
   if (classId) where.classId = classId
   if (teacherId) where.teacherId = teacherId
-  if (status) where.status = status as CourseStatus
+  if (isCourseStatus(status)) where.status = status
 
   const courses = await prisma.course.findMany({ where, orderBy: { createdAt: "desc" } })
 
@@ -103,8 +107,8 @@ export async function POST(req: NextRequest) {
   if (typeof name !== "string" || !name.trim()) return NextResponse.json({ message: "Course name is required" }, { status: 400 })
   if (typeof classId !== "string" || !classId) return NextResponse.json({ message: "classId is required" }, { status: 400 })
 
-  const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true } })
-  if (!cls) return NextResponse.json({ message: "Class not found" }, { status: 400 })
+  const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true, isActive: true } })
+  if (!cls?.isActive) return NextResponse.json({ message: "Select an active class" }, { status: 400 })
 
   const tid = typeof teacherId === "string" && teacherId ? teacherId : null
   if (tid) {

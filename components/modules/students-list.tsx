@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Plus, Pencil, Trash2, Search, Users, CalendarClock, GraduationCap, Upload } from "lucide-react"
+import { Plus, Pencil, Trash2, Search, Users, CalendarClock, GraduationCap, Upload, ReceiptText } from "lucide-react"
 import * as XLSX from "xlsx"
 import { isStudentNameHeader, normalizeImportHeader, parseStudentFullName } from "@/lib/student-import"
 
@@ -28,6 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import PaymentReceiptDialog from "@/components/modules/payment-receipt-dialog"
 
 type ClassOption = { id: string; name: string; level: string | null; isActive: boolean }
 type PaymentStatus = "PAID" | "PARTIAL" | "UNPAID"
@@ -52,6 +53,7 @@ type StudentRow = {
   remainingBalance?: number
   creditBalance?: number
   paymentCount?: number
+  lastPaymentId?: string | null
 }
 
 const NO_CLASS_VALUE = "__none__"
@@ -187,6 +189,7 @@ export default function StudentsList() {
   const [quickPayFeeAmount, setQuickPayFeeAmount] = useState("")
   const [quickPayNote, setQuickPayNote] = useState("")
   const [quickPaySaving, setQuickPaySaving] = useState(false)
+  const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null)
 
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
@@ -246,7 +249,7 @@ export default function StudentsList() {
 
   const fetchClasses = async () => {
     try {
-      const res = await api.get<ClassOption[]>("/api/classes")
+      const res = await api.get<ClassOption[]>("/api/classes?assignmentEligible=true")
       setClasses(res.data)
     } catch (e: any) {
       toast({ title: "Failed to load classes", description: getErrorMessage(e), variant: "destructive" })
@@ -342,6 +345,7 @@ export default function StudentsList() {
 
     setSaving(true)
     try {
+      let savedPaymentId: string | null = null
       const payload = buildStudentPayload({
         firstName,
         lastName,
@@ -378,18 +382,20 @@ export default function StudentsList() {
 
         const numericAmount = paymentAmount.trim() ? Number(paymentAmount) : NaN
         if (Number.isFinite(numericAmount) && numericAmount > 0) {
-          await api.post("/api/payments", {
+          const paymentResponse = await api.post("/api/payments", {
             studentId: editing.id,
             amount: numericAmount,
             feeAmount: numericFeeAmount,
             note: paymentNote.trim() ? paymentNote.trim() : null,
           })
+          savedPaymentId = typeof paymentResponse.data?.id === "string" ? paymentResponse.data.id : null
           toast({ title: "Student updated", description: "Payment recorded successfully." })
         } else {
           toast({ title: "Student updated successfully" })
         }
       } else {
         const res = await api.post("/api/students", payload)
+        savedPaymentId = typeof res.data?.paymentId === "string" ? res.data.paymentId : null
         const confirmation = res.data?.whatsappConfirmation
         if (enrollmentStatus === "VISIT_SCHEDULED") {
           if (confirmation?.status === "SENT") {
@@ -423,6 +429,7 @@ export default function StudentsList() {
       setFormOpen(false)
       resetForm()
       await fetchStudents()
+      if (savedPaymentId && isAdmin) setReceiptPaymentId(savedPaymentId)
     } catch (e: any) {
       const status = e?.response?.status
       if (status === 404) {
@@ -532,7 +539,7 @@ export default function StudentsList() {
 
     setQuickPaySaving(true)
     try {
-      await api.post("/api/payments", {
+      const paymentResponse = await api.post("/api/payments", {
         studentId: quickPayStudent.id,
         amount: numericAmount,
         feeAmount: numericFeeAmount,
@@ -545,6 +552,7 @@ export default function StudentsList() {
       setQuickPayOpen(false)
       setQuickPayStudent(null)
       await fetchStudents()
+      if (typeof paymentResponse.data?.id === "string") setReceiptPaymentId(paymentResponse.data.id)
     } catch (e: any) {
       toast({ title: "Payment failed", description: getErrorMessage(e), variant: "destructive" })
     } finally {
@@ -782,12 +790,12 @@ export default function StudentsList() {
                   <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden lg:table-cell min-w-[140px]">Registration</TableHead>
                   <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden md:table-cell min-w-[140px]">Class</TableHead>
                   {isAdmin && (
-                    <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden xl:table-cell min-w-[140px]">
-                      Registered By
+                    <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground min-w-[140px] text-right pr-6">
+                      Balance / Due
                     </TableHead>
                   )}
                   {isAdmin && (
-                    <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden lg:table-cell min-w-[100px]">
+                    <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden lg:table-cell min-w-[100px] text-right pr-6">
                       Amount Paid
                     </TableHead>
                   )}
@@ -853,16 +861,18 @@ export default function StudentsList() {
                       )}
                     </TableCell>
                     {isAdmin && (
-                      <TableCell className="hidden xl:table-cell py-4 align-middle">
-                        {student.registeredBy?.name ? (
-                          <span className="text-sm text-muted-foreground">{student.registeredBy.name}</span>
+                      <TableCell className="py-4 align-middle font-semibold tabular-nums text-right pr-6">
+                        {(student.creditBalance ?? 0) > 0 ? (
+                          <span className="text-emerald-700">Credit {formatCurrency(student.creditBalance ?? 0)}</span>
+                        ) : (student.remainingBalance ?? 0) > 0 ? (
+                          <span className="text-[#EC4724]">{formatCurrency(student.remainingBalance ?? 0)} Due</span>
                         ) : (
-                          <span className="text-sm text-muted-foreground italic">—</span>
+                          <span className="text-emerald-700">{formatCurrency(0)}</span>
                         )}
                       </TableCell>
                     )}
                     {isAdmin && (
-                      <TableCell className="hidden lg:table-cell py-4 align-middle font-semibold tabular-nums text-[#003D9E]">
+                      <TableCell className="hidden lg:table-cell py-4 align-middle font-semibold tabular-nums text-[#003D9E] text-right pr-6">
                         {formatCurrency(student.totalPaid ?? 0)}
                       </TableCell>
                     )}
@@ -914,6 +924,18 @@ export default function StudentsList() {
                     )}
                     <TableCell className="text-right py-4 pr-6 align-middle">
                       <div className="flex justify-end gap-1">
+                        {isAdmin && student.lastPaymentId && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setReceiptPaymentId(student.lastPaymentId ?? null)}
+                            aria-label="View latest payment receipt"
+                            title="View latest payment receipt"
+                            className="h-8 w-8 text-muted-foreground hover:text-[#003D9E] hover:bg-blue-50 rounded-full transition-colors"
+                          >
+                            <ReceiptText className="w-4 h-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="icon"
@@ -1142,7 +1164,7 @@ export default function StudentsList() {
                       : "Enter the total fee expected. If the student paid now, also enter the amount received."}
                   </p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="feeAmount">Total Fee (USD)</Label>
                     <Input
@@ -1168,7 +1190,7 @@ export default function StudentsList() {
                       className="bg-background"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 sm:col-span-2">
                     <Label htmlFor="paymentNote">
                       Payment note <span className="text-muted-foreground font-normal">(optional)</span>
                     </Label>
@@ -1396,6 +1418,12 @@ export default function StudentsList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PaymentReceiptDialog
+        paymentId={receiptPaymentId}
+        open={Boolean(receiptPaymentId)}
+        onOpenChange={(open) => !open && setReceiptPaymentId(null)}
+      />
     </div>
   )
 }

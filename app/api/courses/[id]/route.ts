@@ -42,8 +42,8 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
   if (typeof name === "string") update.name = name.trim()
 
   if (typeof classId === "string") {
-    const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true } })
-    if (!cls) return NextResponse.json({ message: "Class not found" }, { status: 400 })
+    const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true, isActive: true } })
+    if (!cls?.isActive) return NextResponse.json({ message: "Select an active class" }, { status: 400 })
     update.classId = classId
   }
 

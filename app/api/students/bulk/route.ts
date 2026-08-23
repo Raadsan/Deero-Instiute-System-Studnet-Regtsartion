@@ -53,12 +53,19 @@ export async function POST(req: Request) {
     }
     const classes = classIds.length
       ? await prisma.class.findMany({
-          where: { id: { in: classIds }, isActive: true },
+          where: {
+            id: { in: classIds },
+            isActive: true,
+            courses: { some: { status: { in: ["ACTIVE", "SCHEDULED"] } } },
+          },
           select: { id: true, name: true },
         })
       : []
     if (classes.length !== classIds.length) {
-      return NextResponse.json({ message: "One or more selected classes are invalid." }, { status: 400 });
+      return NextResponse.json(
+        { message: "Select a class with an active or upcoming course." },
+        { status: 400 },
+      );
     }
     const classNameById = new Map(classes.map((item) => [item.id, item.name]))
 

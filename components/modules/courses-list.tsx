@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Plus, Pencil, Trash2, Search, BookOpen } from "lucide-react"
+import { Plus, Pencil, Trash2, Search, BookOpen, CheckCircle2, History, RotateCcw } from "lucide-react"
 
 import { api } from "@/lib/api"
 import { toast } from "@/hooks/use-toast"
@@ -26,6 +26,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type CourseStatus = "ACTIVE" | "SCHEDULED" | "INACTIVE"
 
@@ -68,7 +69,7 @@ function statusLabel(status: CourseStatus) {
     case "SCHEDULED":
       return "Scheduled"
     case "INACTIVE":
-      return "Inactive"
+      return "Completed"
   }
 }
 
@@ -81,6 +82,7 @@ export default function CoursesList() {
   const [error, setError] = useState<string | null>(null)
 
   const [searchTerm, setSearchTerm] = useState("")
+  const [courseView, setCourseView] = useState<"active" | "previous">("active")
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<CourseRow | null>(null)
@@ -96,6 +98,8 @@ export default function CoursesList() {
 
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [completeId, setCompleteId] = useState<string | null>(null)
+  const [statusUpdatingId, setStatusUpdatingId] = useState<string | null>(null)
 
   const resetForm = () => {
     setEditing(null)
@@ -139,7 +143,7 @@ export default function CoursesList() {
   const fetchClasses = async () => {
     try {
       const res = await api.get<ClassOption[]>("/api/classes")
-      setClasses(res.data)
+      setClasses(res.data.filter((item) => item.isActive))
     } catch (e: any) {
       toast({ title: "Failed to load classes", description: getErrorMessage(e), variant: "destructive" })
     }
@@ -148,7 +152,7 @@ export default function CoursesList() {
   const fetchTeachers = async () => {
     try {
       const res = await api.get<TeacherOption[]>("/api/teachers?includeInactive=true")
-      setTeachers(res.data)
+      setTeachers(res.data.filter((item) => item.isActive !== false))
     } catch (e: any) {
       toast({ title: "Failed to load teachers", description: getErrorMessage(e), variant: "destructive" })
     }
@@ -170,6 +174,12 @@ export default function CoursesList() {
       return c.name.toLowerCase().includes(q) || teacherName.toLowerCase().includes(q) || className.toLowerCase().includes(q)
     })
   }, [courses, searchTerm])
+
+  const activeCourseCount = courses.filter((course) => course.status !== "INACTIVE").length
+  const previousCourseCount = courses.filter((course) => course.status === "INACTIVE").length
+  const visibleCourses = filteredCourses.filter((course) =>
+    courseView === "active" ? course.status !== "INACTIVE" : course.status === "INACTIVE",
+  )
 
   const submit = async () => {
     if (!name.trim()) {
@@ -234,6 +244,39 @@ export default function CoursesList() {
     }
   }
 
+  const confirmComplete = async () => {
+    if (!completeId) return
+    setStatusUpdatingId(completeId)
+    try {
+      await api.patch(`/api/courses/${completeId}`, { status: "INACTIVE" })
+      setCourses((current) =>
+        current.map((course) => (course.id === completeId ? { ...course, status: "INACTIVE" } : course)),
+      )
+      toast({ title: "Course completed", description: "It was moved to Previous Courses." })
+      setCompleteId(null)
+    } catch (e: any) {
+      toast({ title: "Update failed", description: getErrorMessage(e), variant: "destructive" })
+    } finally {
+      setStatusUpdatingId(null)
+    }
+  }
+
+  const restoreCourse = async (course: CourseRow) => {
+    if (statusUpdatingId) return
+    setStatusUpdatingId(course.id)
+    try {
+      await api.patch(`/api/courses/${course.id}`, { status: "ACTIVE" })
+      setCourses((current) =>
+        current.map((item) => (item.id === course.id ? { ...item, status: "ACTIVE" } : item)),
+      )
+      toast({ title: "Course reopened", description: "It is active again and available for assignment." })
+    } catch (e: any) {
+      toast({ title: "Update failed", description: getErrorMessage(e), variant: "destructive" })
+    } finally {
+      setStatusUpdatingId(null)
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto space-y-6 sm:space-y-8">
       <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-br from-[#003D9E]/10 via-background to-[#EC4724]/5 p-6 sm:p-8">
@@ -242,7 +285,7 @@ export default function CoursesList() {
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 rounded-full bg-background/80 border border-primary/15 px-3 py-1 text-xs font-medium text-primary">
               <BookOpen className="w-3.5 h-3.5" />
-              {filteredCourses.length} course{filteredCourses.length === 1 ? "" : "s"}
+              {activeCourseCount} active / upcoming course{activeCourseCount === 1 ? "" : "s"}
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Courses</h1>
             <p className="text-sm sm:text-base text-muted-foreground max-w-xl">
@@ -254,6 +297,19 @@ export default function CoursesList() {
           </Button>
         </div>
       </div>
+
+      <Tabs value={courseView} onValueChange={(value) => setCourseView(value as "active" | "previous")}>
+        <TabsList className="grid h-12 w-full max-w-xl grid-cols-2 rounded-xl bg-muted/60 p-1">
+          <TabsTrigger value="active" className="gap-2 rounded-lg">
+            <BookOpen className="h-4 w-4" />
+            Active & Upcoming ({activeCourseCount})
+          </TabsTrigger>
+          <TabsTrigger value="previous" className="gap-2 rounded-lg">
+            <History className="h-4 w-4" />
+            Previous Courses ({previousCourseCount})
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
 
       <Card className="p-4 sm:p-5 border-muted/50 shadow-sm">
         <div className="max-w-xl space-y-2">
@@ -277,13 +333,19 @@ export default function CoursesList() {
         </Card>
       ) : error ? (
         <Card className="p-6 text-sm bg-destructive/5 text-destructive border-destructive/20 shadow-sm">{error}</Card>
-      ) : filteredCourses.length === 0 ? (
+      ) : visibleCourses.length === 0 ? (
         <Card className="p-12 flex flex-col items-center justify-center gap-4 text-muted-foreground border-dashed shadow-sm">
           <div className="p-4 rounded-full bg-muted">
-            <Search className="w-8 h-8 opacity-50" />
+            {courseView === "active" ? <BookOpen className="w-8 h-8 opacity-50" /> : <History className="w-8 h-8 opacity-50" />}
           </div>
-          <p className="text-lg font-medium">No courses found</p>
-          <p className="text-sm">Try adjusting your search query.</p>
+          <p className="text-lg font-medium">{courseView === "active" ? "No active courses found" : "No previous courses found"}</p>
+          <p className="text-sm">
+            {searchTerm.trim()
+              ? "Try adjusting your search query."
+              : courseView === "active"
+                ? "Create a course to get started."
+                : "Completed courses will appear here."}
+          </p>
         </Card>
       ) : (
         <div className="rounded-xl border border-muted/50 bg-card shadow-sm overflow-hidden">
@@ -300,7 +362,7 @@ export default function CoursesList() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredCourses.map((course) => (
+                {visibleCourses.map((course) => (
                   <TableRow key={course.id} className="group hover:bg-muted/40 transition-colors border-b-muted/40 last:border-0">
                     <TableCell className="py-4 pl-6 font-medium">
                       <div className="space-y-0.5">
@@ -341,24 +403,48 @@ export default function CoursesList() {
                     </TableCell>
                     <TableCell className="text-right py-4 pr-6 align-middle">
                       <div className="flex justify-end gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => openEdit(course)}
-                          aria-label="Edit course"
-                          className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                        >
-                          <Pencil className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setDeleteId(course.id)}
-                          aria-label="Delete course"
-                          className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        {course.status === "INACTIVE" ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => void restoreCourse(course)}
+                            disabled={statusUpdatingId === course.id}
+                            className="rounded-full gap-1.5"
+                          >
+                            {statusUpdatingId === course.id ? <Spinner /> : <RotateCcw className="w-3.5 h-3.5" />}
+                            Reopen
+                          </Button>
+                        ) : (
+                          <>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEdit(course)}
+                              aria-label="Edit course"
+                              className="h-8 w-8 text-muted-foreground hover:text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setCompleteId(course.id)}
+                              aria-label="Complete course"
+                              className="h-8 w-8 text-muted-foreground hover:text-emerald-700 hover:bg-emerald-50 rounded-full transition-colors"
+                            >
+                              <CheckCircle2 className="w-4 h-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeleteId(course.id)}
+                              aria-label="Delete course"
+                              className="h-8 w-8 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -433,7 +519,7 @@ export default function CoursesList() {
                   <SelectContent className={selectContentClass} position="popper">
                     <SelectItem value="ACTIVE">Active</SelectItem>
                     <SelectItem value="SCHEDULED">Scheduled</SelectItem>
-                    <SelectItem value="INACTIVE">Inactive</SelectItem>
+                    <SelectItem value="INACTIVE">Completed</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -485,6 +571,30 @@ export default function CoursesList() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={Boolean(completeId)} onOpenChange={(open) => !open && setCompleteId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Complete this course?</AlertDialogTitle>
+            <AlertDialogDescription>
+              The course will leave Active & Upcoming and move to Previous Courses. Its information remains available and it can be reopened later.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={Boolean(statusUpdatingId)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void confirmComplete()} disabled={Boolean(statusUpdatingId)}>
+              {statusUpdatingId ? (
+                <>
+                  <Spinner className="mr-2" />
+                  Completing...
+                </>
+              ) : (
+                "Complete Course"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={Boolean(deleteId)} onOpenChange={(open) => !open && setDeleteId(null)}>
         <AlertDialogContent>

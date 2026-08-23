@@ -64,17 +64,29 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
   const body = await req.json();
 
-  const classId = (body.classId as string | null | undefined) ?? null;
-  if (classId) {
-    const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true } });
-    if (!cls) return NextResponse.json({ message: "Class not found" }, { status: 400 });
-  }
-
   const existing = await prisma.student.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ message: "Student not found" }, { status: 404 });
 
   if (session.role === "REGISTRAR" && !idsMatch(existing.registeredById, session.userId)) {
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
+  }
+
+  const classId = (body.classId as string | null | undefined) ?? null;
+  if (classId && classId !== existing.classId) {
+    const cls = await prisma.class.findFirst({
+      where: {
+        id: classId,
+        isActive: true,
+        courses: { some: { status: { in: ["ACTIVE", "SCHEDULED"] } } },
+      },
+      select: { id: true },
+    });
+    if (!cls) {
+      return NextResponse.json(
+        { message: "Select a class with an active or upcoming course" },
+        { status: 400 },
+      );
+    }
   }
 
   const enrollment = parseStudentEnrollmentInput(body, {

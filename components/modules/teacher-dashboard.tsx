@@ -87,7 +87,7 @@ export default function TeacherDashboard() {
         <Card className="flex items-center justify-between gap-4 p-5">
           <div className="flex items-center gap-4">
             <div className="rounded-xl bg-amber-500/10 p-3 text-amber-700"><FileBarChart /></div>
-            <div><h2 className="font-bold">Attendance Reports</h2><p className="text-sm text-muted-foreground">Generate a monthly class report.</p></div>
+            <div><h2 className="font-bold">Attendance Reports</h2><p className="text-sm text-muted-foreground">Generate a monthly or custom date-range report.</p></div>
           </div>
           <Button asChild size="icon" variant="ghost"><Link href="/attendance-report"><ArrowRight /></Link></Button>
         </Card>

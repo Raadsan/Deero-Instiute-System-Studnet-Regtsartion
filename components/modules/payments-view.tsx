@@ -24,6 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import PaymentReceiptDialog from "@/components/modules/payment-receipt-dialog"
 
 type ClassOption = { id: string; name: string; level: string | null }
 type PaymentStatus = "PAID" | "PARTIAL" | "UNPAID"
@@ -52,6 +53,7 @@ type StudentLedger = {
   creditBalance: number
   paymentCount: number
   lastPaidAt: string | null
+  lastPaymentId: string | null
 }
 type RecordedByInfo = {
   id: string
@@ -62,6 +64,7 @@ type RecordedByInfo = {
 
 type PaymentRow = {
   id: string
+  receiptNo: string
   amount: number
   currency: string
   paidAt: string
@@ -149,6 +152,7 @@ export default function PaymentsView() {
   const [amount, setAmount] = useState("")
   const [note, setNote] = useState("")
   const [saving, setSaving] = useState(false)
+  const [receiptPaymentId, setReceiptPaymentId] = useState<string | null>(null)
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -266,6 +270,9 @@ export default function PaymentsView() {
               : "The fee is fully paid.",
       })
       setDialogOpen(false)
+      if (numericAmount > 0 && typeof res.data.id === "string") {
+        setReceiptPaymentId(res.data.id)
+      }
       await fetchData()
     } catch (e: any) {
       toast({ title: "Save failed", description: getErrorMessage(e), variant: "destructive" })
@@ -527,11 +534,23 @@ export default function PaymentsView() {
                               </Badge>
                             </TableCell>
                             <TableCell className="py-4 pr-6 text-right">
-                              {student.paymentStatus !== "PAID" && (
-                                <Button size="sm" variant="outline" className="rounded-full" onClick={() => openDialog(student.id)}>
-                                  {student.feeAmount > 0 ? "Record" : "Set Fee"}
-                                </Button>
-                              )}
+                              <div className="flex justify-end gap-2">
+                                {student.lastPaymentId && (
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    className="rounded-full gap-1.5 text-[#003D9E]"
+                                    onClick={() => setReceiptPaymentId(student.lastPaymentId)}
+                                  >
+                                    <Receipt className="h-3.5 w-3.5" /> Receipt
+                                  </Button>
+                                )}
+                                {student.paymentStatus !== "PAID" && (
+                                  <Button size="sm" variant="outline" className="rounded-full" onClick={() => openDialog(student.id)}>
+                                    {student.feeAmount > 0 ? "Record" : "Set Fee"}
+                                  </Button>
+                                )}
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -584,9 +603,21 @@ export default function PaymentsView() {
                               <Badge className={paymentStatusClass(student.paymentStatus)}>{paymentStatusLabel(student.paymentStatus)}</Badge>
                             </TableCell>
                             <TableCell className="py-4 pr-6 text-right">
-                              <Button size="sm" className="rounded-full" onClick={() => openDialog(student.id)}>
-                                {student.feeAmount > 0 ? "Record Payment" : "Set Total Fee"}
-                              </Button>
+                              <div className="flex justify-end gap-2">
+                                {student.lastPaymentId && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="rounded-full gap-1.5"
+                                    onClick={() => setReceiptPaymentId(student.lastPaymentId)}
+                                  >
+                                    <Receipt className="h-3.5 w-3.5" /> Receipt
+                                  </Button>
+                                )}
+                                <Button size="sm" className="rounded-full" onClick={() => openDialog(student.id)}>
+                                  {student.feeAmount > 0 ? "Record Payment" : "Set Total Fee"}
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ))
@@ -611,18 +642,20 @@ export default function PaymentsView() {
                     <TableHeader className="bg-muted/30">
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="pl-6 min-w-[180px]">Student</TableHead>
+                        <TableHead>Receipt No</TableHead>
                         <TableHead className="hidden md:table-cell">Class</TableHead>
                         <TableHead>Amount</TableHead>
                         <TableHead className="hidden md:table-cell">Date</TableHead>
                         <TableHead className="hidden lg:table-cell">Note</TableHead>
                         <TableHead className="hidden xl:table-cell">Recorded By</TableHead>
                         <TableHead className="pr-6 text-center">Account Status</TableHead>
+                        <TableHead className="pr-6 text-right">Receipt</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {(summary?.recentPayments ?? []).length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={7} className="py-10 text-center text-muted-foreground text-sm">
+                          <TableCell colSpan={9} className="py-10 text-center text-muted-foreground text-sm">
                             No payments recorded yet.
                           </TableCell>
                         </TableRow>
@@ -633,6 +666,9 @@ export default function PaymentsView() {
                               {payment.student
                                 ? formatPersonName(payment.student.firstName, payment.student.lastName)
                                 : "—"}
+                            </TableCell>
+                            <TableCell className="py-4 font-mono text-xs font-semibold text-[#003D9E]">
+                              {payment.receiptNo}
                             </TableCell>
                             <TableCell className="hidden md:table-cell py-4 capitalize">
                               {payment.student?.class?.name ?? "—"}
@@ -657,6 +693,16 @@ export default function PaymentsView() {
                               ) : (
                                 "—"
                               )}
+                            </TableCell>
+                            <TableCell className="py-4 pr-6 text-right">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="rounded-full gap-1.5"
+                                onClick={() => setReceiptPaymentId(payment.id)}
+                              >
+                                <Receipt className="h-3.5 w-3.5" /> View
+                              </Button>
                             </TableCell>
                           </TableRow>
                         ))
@@ -784,6 +830,12 @@ export default function PaymentsView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PaymentReceiptDialog
+        paymentId={receiptPaymentId}
+        open={Boolean(receiptPaymentId)}
+        onOpenChange={(open) => !open && setReceiptPaymentId(null)}
+      />
     </div>
   )
 }

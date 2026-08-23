@@ -148,6 +148,15 @@ export async function GET(req: Request) {
       })
     : []
 
+  const latestPayments = studentIds.length
+    ? await prisma.payment.findMany({
+        where: { studentId: { in: studentIds } },
+        select: { id: true, studentId: true },
+        orderBy: [{ studentId: "asc" }, { paidAt: "desc" }, { createdAt: "desc" }],
+        distinct: ["studentId"],
+      })
+    : []
+
   const paymentMap = new Map(
     paymentAgg.map((row) => [
       row.studentId,
@@ -157,6 +166,7 @@ export async function GET(req: Request) {
       },
     ]),
   )
+  const latestPaymentMap = new Map(latestPayments.map((payment) => [payment.studentId, payment.id]))
 
   return NextResponse.json({
     items: students.map((s) => {
@@ -166,6 +176,7 @@ export async function GET(req: Request) {
         ...mapStudent(s, classMap, registrarMap),
         ...balances,
         paymentCount: paymentStats?.paymentCount ?? 0,
+        lastPaymentId: latestPaymentMap.get(s.id) ?? null,
       }
     }),
     pagination: buildPaginationMeta(page, pageSize, total),
@@ -182,8 +193,20 @@ export async function POST(req: Request) {
   const classId = (body.classId as string | null | undefined) ?? null;
   let className: string | null = null;
   if (classId) {
-    const cls = await prisma.class.findUnique({ where: { id: classId }, select: { id: true, name: true } });
-    if (!cls) return NextResponse.json({ message: "Class not found" }, { status: 400 });
+    const cls = await prisma.class.findFirst({
+      where: {
+        id: classId,
+        isActive: true,
+        courses: { some: { status: { in: ["ACTIVE", "SCHEDULED"] } } },
+      },
+      select: { id: true, name: true },
+    });
+    if (!cls) {
+      return NextResponse.json(
+        { message: "Select a class with an active or upcoming course" },
+        { status: 400 },
+      );
+    }
     className = cls.name;
   }
 
@@ -247,21 +270,28 @@ export async function POST(req: Request) {
       },
     })
 
+    let paymentId: string | null = null
     if (hasRegistrationPayment && enrollment.data.enrollmentStatus !== "VISIT_SCHEDULED") {
-      await tx.payment.create({
+      const balances = getStudentFeeBalances(feeAmount, paymentAmount)
+      const payment = await tx.payment.create({
         data: {
           studentId: student.id,
           amount: paymentAmount,
           note: paymentNote ?? "Registration payment",
           recordedById: session.userId,
+          feeAmountSnapshot: feeAmount,
+          totalPaidSnapshot: balances.totalPaid,
+          balanceSnapshot: balances.remainingBalance,
+          statusSnapshot: paymentStatus,
         },
       })
+      paymentId = payment.id
     }
 
-    return student
+    return { student, paymentId }
   })
 
-  const studentId = inserted.id;
+  const studentId = inserted.student.id;
 
   let whatsappConfirmation: { status: string; error?: string } | null = null;
   if (enrollment.data.enrollmentStatus === "VISIT_SCHEDULED" && enrollment.data.visitDate && phone?.trim()) {
@@ -288,7 +318,8 @@ export async function POST(req: Request) {
   return NextResponse.json(
     {
       id: studentId,
-      studentCode: inserted.studentCode,
+      studentCode: inserted.student.studentCode,
+      paymentId: inserted.paymentId,
       ...body,
       feeAmount,
       paymentStatus,
