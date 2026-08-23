@@ -43,7 +43,7 @@ export function buildAdminReportCsv(report: AdminSystemReport) {
         ["Enrolled Students", cell(report.overview.enrolledStudents)],
         ["Visit Scheduled", cell(report.overview.visitScheduledStudents)],
         ["Paid Students", cell(report.overview.paidStudents)],
-        ["Unpaid Students", cell(report.overview.unpaidStudents)],
+        ["Outstanding Students", cell(report.overview.unpaidStudents)],
         ["Total Teachers", cell(report.overview.totalTeachers)],
         ["Total Classes", cell(report.overview.totalClasses)],
         ["Attendance Rate (7d)", `${report.overview.attendanceRate.toFixed(1)}%`],
@@ -67,7 +67,7 @@ export function buildAdminReportCsv(report: AdminSystemReport) {
       ],
     },
     {
-      title: "Unpaid Students",
+      title: "Outstanding Students",
       rows: [
         ["Name", "Class", "Phone"],
         ...report.unpaidStudents.map((row) => [row.name, row.className ?? "", row.phone ?? ""]),
@@ -153,7 +153,7 @@ export async function buildAdminReportPdf(report: AdminSystemReport) {
     subtitle: `${brand} · ${report.range.label} · Generated ${stamp}`,
     summary: [
       { label: "Total Students", value: String(report.overview.totalStudents) },
-      { label: "Unpaid Students", value: String(report.overview.unpaidStudents), highlight: true },
+      { label: "Outstanding Students", value: String(report.overview.unpaidStudents), highlight: true },
       { label: "Visit Scheduled", value: String(report.overview.visitScheduledStudents) },
       { label: "Attendance Rate (7d)", value: `${report.overview.attendanceRate.toFixed(1)}%` },
       { label: "Student Fees (Period)", value: formatMoney(report.money.studentFeesPeriod) },

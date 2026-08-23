@@ -16,6 +16,7 @@ enum Role {
 
 enum PaymentStatus {
   PAID
+  PARTIAL
   UNPAID
 }
 
@@ -258,6 +259,7 @@ model Student {
   phone               String?
   email               String?
   gender              String?
+  feeAmount           Float            @default(0)
   paymentStatus       PaymentStatus    @default(UNPAID)
   enrollmentStatus    EnrollmentStatus @default(ENROLLED)
   visitDate           DateTime?

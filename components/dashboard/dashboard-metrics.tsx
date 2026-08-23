@@ -63,7 +63,7 @@ const attendanceChartConfig = {
 
 const paymentChartConfig = {
   paid: { label: "Paid", color: "var(--chart-1)" },
-  unpaid: { label: "Unpaid", color: "var(--chart-2)" },
+  unpaid: { label: "Outstanding", color: "var(--chart-2)" },
 } satisfies ChartConfig
 
 const classSizeChartConfig = {
@@ -324,7 +324,7 @@ export default function DashboardMetrics() {
               )}
             </ChartCard>
 
-            <ChartCard title="Payment Status" description="Paid vs unpaid students" icon={Wallet}>
+            <ChartCard title="Payment Status" description="Paid vs students with an outstanding balance" icon={Wallet}>
               {paymentTotal === 0 ? (
                 <EmptyChart message="No payment records yet" />
               ) : (
@@ -370,7 +370,7 @@ export default function DashboardMetrics() {
                       <p className="text-xl font-bold text-foreground tabular-nums">{summary?.paidStudents ?? 0}</p>
                     </div>
                     <div className="rounded-xl bg-[#EC4724]/8 border border-[#EC4724]/15 p-3 text-center">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#EC4724]">Unpaid</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-[#EC4724]">Outstanding</p>
                       <p className="text-xl font-bold text-foreground tabular-nums">{summary?.unpaidStudents ?? 0}</p>
                     </div>
                   </div>

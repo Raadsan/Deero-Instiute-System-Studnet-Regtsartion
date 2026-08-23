@@ -7,6 +7,7 @@ import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { buildStudentSearchFilter } from "@/lib/student-search";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { nextStudentCode } from "@/lib/student-code";
+import { getStudentFeeBalances, getStudentPaymentStatus, roundMoney } from "@/lib/student-fees";
 
 function mapStudent(
   s: {
@@ -17,6 +18,7 @@ function mapStudent(
     phone: string | null;
     email: string | null;
     gender: string | null;
+    feeAmount: number;
     paymentStatus: string;
     enrollmentStatus: string;
     visitDate: Date | null;
@@ -43,6 +45,7 @@ function mapStudent(
     phone: s.phone ?? null,
     email: s.email ?? null,
     gender: s.gender ?? null,
+    feeAmount: Number(s.feeAmount ?? 0),
     paymentStatus: s.paymentStatus ?? "UNPAID",
     enrollmentStatus: s.enrollmentStatus ?? "ENROLLED",
     visitDate: s.visitDate ?? null,
@@ -74,7 +77,7 @@ export async function GET(req: Request) {
   const where: Prisma.StudentWhereInput = {};
   if (classId) where.classId = classId;
   if (paymentStatus) {
-    if (paymentStatus !== "PAID" && paymentStatus !== "UNPAID") {
+    if (paymentStatus !== "PAID" && paymentStatus !== "PARTIAL" && paymentStatus !== "UNPAID") {
       return NextResponse.json({ message: "Invalid paymentStatus" }, { status: 400 });
     }
     where.paymentStatus = paymentStatus;
@@ -158,9 +161,10 @@ export async function GET(req: Request) {
   return NextResponse.json({
     items: students.map((s) => {
       const paymentStats = paymentMap.get(s.id)
+      const balances = getStudentFeeBalances(s.feeAmount, paymentStats?.totalPaid ?? 0)
       return {
         ...mapStudent(s, classMap, registrarMap),
-        totalPaid: paymentStats?.totalPaid ?? 0,
+        ...balances,
         paymentCount: paymentStats?.paymentCount ?? 0,
       }
     }),
@@ -194,14 +198,20 @@ export async function POST(req: Request) {
   const paymentNote =
     typeof body.paymentNote === "string" && body.paymentNote.trim() ? body.paymentNote.trim() : null
 
-  let paymentStatus =
-    session.role === "REGISTRAR" && !hasRegistrationPayment
-      ? "UNPAID"
-      : (body.paymentStatus ?? "UNPAID")
-  if (hasRegistrationPayment) paymentStatus = "PAID"
-  if (paymentStatus !== "PAID" && paymentStatus !== "UNPAID") {
-    return NextResponse.json({ message: "Invalid paymentStatus" }, { status: 400 });
+  const feeAmountRaw = body.feeAmount
+  const hasFeeAmount = feeAmountRaw !== undefined && feeAmountRaw !== null && feeAmountRaw !== ""
+  const parsedFeeAmount = hasFeeAmount
+    ? typeof feeAmountRaw === "number"
+      ? feeAmountRaw
+      : Number(feeAmountRaw)
+    : hasRegistrationPayment
+      ? paymentAmount
+      : 0
+  if (!Number.isFinite(parsedFeeAmount) || parsedFeeAmount < 0) {
+    return NextResponse.json({ message: "feeAmount must be zero or a positive number" }, { status: 400 });
   }
+  const feeAmount = roundMoney(parsedFeeAmount)
+  let paymentStatus = getStudentPaymentStatus(feeAmount, hasRegistrationPayment ? paymentAmount : 0)
 
   const enrollment = parseStudentEnrollmentInput(body);
   if (!enrollment.ok) return NextResponse.json({ message: enrollment.message }, { status: 400 });
@@ -225,6 +235,7 @@ export async function POST(req: Request) {
         phone: phone ?? null,
         email: body.email ?? null,
         gender: body.gender ?? null,
+        feeAmount,
         paymentStatus,
         enrollmentStatus: enrollment.data.enrollmentStatus,
         visitDate: enrollment.data.visitDate,
@@ -279,6 +290,8 @@ export async function POST(req: Request) {
       id: studentId,
       studentCode: inserted.studentCode,
       ...body,
+      feeAmount,
+      paymentStatus,
       enrollmentStatus: enrollment.data.enrollmentStatus,
       visitDate: enrollment.data.visitDate,
       visitNote: enrollment.data.visitNote,

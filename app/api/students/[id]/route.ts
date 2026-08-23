@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { canManageStudents, getSessionFromRequestCookies } from "@/lib/auth";
 import { idsMatch } from "@/lib/mongo-id";
 import { parseStudentEnrollmentInput } from "@/lib/student-enrollment";
+import { getStudentFeeBalances, getStudentPaymentStatus, roundMoney } from "@/lib/student-fees";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -31,6 +32,9 @@ export async function GET(_: NextRequest, { params }: RouteContext) {
     prisma.attendance.findMany({ where: { studentId: id }, orderBy: { date: "desc" } }),
   ]);
 
+  const totalPaid = payments.reduce((sum, payment) => sum + Number(payment.amount ?? 0), 0)
+  const balances = getStudentFeeBalances(student.feeAmount, totalPaid)
+
   return NextResponse.json({
     id: student.id,
     firstName: student.firstName,
@@ -38,6 +42,7 @@ export async function GET(_: NextRequest, { params }: RouteContext) {
     phone: student.phone ?? null,
     email: student.email ?? null,
     gender: student.gender ?? null,
+    ...balances,
     paymentStatus: student.paymentStatus ?? "UNPAID",
     enrollmentStatus: student.enrollmentStatus ?? "ENROLLED",
     visitDate: student.visitDate ?? null,
@@ -85,13 +90,21 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ message: "Phone number is required for visit scheduled students (WhatsApp)." }, { status: 400 });
   }
 
-  const isRegistrar = session.role === "REGISTRAR";
-  const paymentStatus = isRegistrar
-    ? (existing.paymentStatus ?? "UNPAID")
-    : (body.paymentStatus ?? "UNPAID");
-  if (paymentStatus !== "PAID" && paymentStatus !== "UNPAID") {
-    return NextResponse.json({ message: "Invalid paymentStatus" }, { status: 400 });
+  const feeAmountRaw = body.feeAmount
+  const hasFeeAmount = feeAmountRaw !== undefined && feeAmountRaw !== null && feeAmountRaw !== ""
+  const parsedFeeAmount = hasFeeAmount
+    ? typeof feeAmountRaw === "number"
+      ? feeAmountRaw
+      : Number(feeAmountRaw)
+    : existing.feeAmount
+  if (!Number.isFinite(parsedFeeAmount) || parsedFeeAmount < 0) {
+    return NextResponse.json({ message: "feeAmount must be zero or a positive number" }, { status: 400 });
   }
+  const feeAmount = roundMoney(parsedFeeAmount)
+  const paymentTotal = await prisma.payment.aggregate({ where: { studentId: id }, _sum: { amount: true } })
+  const paymentStatus = getStudentPaymentStatus(feeAmount, Number(paymentTotal._sum.amount ?? 0))
+
+  const isRegistrar = session.role === "REGISTRAR";
 
   const isActive = isRegistrar
     ? Boolean(existing.isActive)
@@ -107,6 +120,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
       phone: phone ?? null,
       email: body.email ?? null,
       gender: body.gender ?? null,
+      feeAmount,
       paymentStatus,
       enrollmentStatus: enrollment.data.enrollmentStatus,
       visitDate: enrollment.data.visitDate,

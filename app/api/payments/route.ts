@@ -4,6 +4,7 @@ import { getSessionFromRequestCookies } from "@/lib/auth"
 import { requireFinanceSession } from "@/lib/finance-auth"
 import { buildPaginationMeta, parsePagination } from "@/lib/pagination"
 import { mapRecordedBy, recordedBySelect } from "@/lib/recorded-by"
+import { getStudentFeeBalances, getStudentPaymentStatus, roundMoney } from "@/lib/student-fees"
 import type { Prisma } from "@/lib/generated/prisma/client"
 
 type PaymentRow = {
@@ -110,9 +111,10 @@ export async function POST(req: Request) {
   const body: unknown = await req.json()
   if (!body || typeof body !== "object") return NextResponse.json({ message: "Invalid body" }, { status: 400 })
 
-  const { studentId, amount, currency, note, paidAt } = body as {
+  const { studentId, amount, feeAmount, currency, note, paidAt } = body as {
     studentId?: unknown
     amount?: unknown
+    feeAmount?: unknown
     currency?: unknown
     note?: unknown
     paidAt?: unknown
@@ -127,14 +129,28 @@ export async function POST(req: Request) {
     return NextResponse.json({ message: "amount must be a positive number" }, { status: 400 })
   }
 
+  const hasFeeAmount = feeAmount !== undefined && feeAmount !== null && feeAmount !== ""
+  const numericFeeAmount = hasFeeAmount ? (typeof feeAmount === "number" ? feeAmount : Number(feeAmount)) : null
+  if (hasFeeAmount && (!Number.isFinite(numericFeeAmount) || Number(numericFeeAmount) <= 0)) {
+    return NextResponse.json({ message: "feeAmount must be a positive number" }, { status: 400 })
+  }
+
   const parsedPaidAt = typeof paidAt === "string" ? new Date(paidAt) : paidAt instanceof Date ? paidAt : new Date()
   if (Number.isNaN(parsedPaidAt.getTime())) return NextResponse.json({ message: "Invalid paidAt" }, { status: 400 })
 
   const paymentCurrency = typeof currency === "string" && currency.trim() ? currency.trim().toUpperCase() : "USD"
   const paymentNote = typeof note === "string" && note.trim() ? note.trim() : null
 
-  const student = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true } })
+  const student = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true, feeAmount: true } })
   if (!student) return NextResponse.json({ message: "Student not found" }, { status: 404 })
+
+  const accountFeeAmount = roundMoney(numericFeeAmount ?? student.feeAmount)
+  if (accountFeeAmount <= 0) {
+    return NextResponse.json(
+      { message: "Set the student's total fee before recording a payment" },
+      { status: 400 },
+    )
+  }
 
   const inserted = await prisma.$transaction(async (tx) => {
     const payment = await tx.payment.create({
@@ -148,23 +164,72 @@ export async function POST(req: Request) {
       },
     })
 
+    const paymentTotal = await tx.payment.aggregate({
+      where: { studentId },
+      _sum: { amount: true },
+    })
+    const totalPaid = roundMoney(Number(paymentTotal._sum.amount ?? 0))
+    const paymentStatus = getStudentPaymentStatus(accountFeeAmount, totalPaid)
+
     await tx.student.update({
       where: { id: studentId },
-      data: { paymentStatus: "PAID" },
+      data: { feeAmount: accountFeeAmount, paymentStatus },
     })
 
-    return payment
+    return { payment, totalPaid, paymentStatus }
   })
+
+  const balances = getStudentFeeBalances(accountFeeAmount, inserted.totalPaid)
 
   return NextResponse.json(
     {
-      id: inserted.id,
+      id: inserted.payment.id,
       studentId,
-      amount: numericAmount,
+      amount: roundMoney(numericAmount),
       currency: paymentCurrency,
       note: paymentNote,
       paidAt: parsedPaidAt.toISOString(),
+      paymentStatus: inserted.paymentStatus,
+      ...balances,
     },
     { status: 201 },
   )
+}
+
+export async function PATCH(req: Request) {
+  const session = await getSessionFromRequestCookies()
+  const auth = requireFinanceSession(session)
+  if (!auth.ok) return NextResponse.json({ message: auth.message }, { status: auth.status })
+
+  const body: unknown = await req.json()
+  if (!body || typeof body !== "object") return NextResponse.json({ message: "Invalid body" }, { status: 400 })
+
+  const { studentId, feeAmount } = body as { studentId?: unknown; feeAmount?: unknown }
+  if (typeof studentId !== "string" || !studentId) {
+    return NextResponse.json({ message: "studentId is required" }, { status: 400 })
+  }
+
+  const numericFeeAmount = typeof feeAmount === "number" ? feeAmount : Number(feeAmount)
+  if (!Number.isFinite(numericFeeAmount) || numericFeeAmount <= 0) {
+    return NextResponse.json({ message: "feeAmount must be a positive number" }, { status: 400 })
+  }
+
+  const accountFeeAmount = roundMoney(numericFeeAmount)
+  const student = await prisma.student.findUnique({ where: { id: studentId }, select: { id: true } })
+  if (!student) return NextResponse.json({ message: "Student not found" }, { status: 404 })
+
+  const paymentTotal = await prisma.payment.aggregate({ where: { studentId }, _sum: { amount: true } })
+  const totalPaid = roundMoney(Number(paymentTotal._sum.amount ?? 0))
+  const paymentStatus = getStudentPaymentStatus(accountFeeAmount, totalPaid)
+
+  await prisma.student.update({
+    where: { id: studentId },
+    data: { feeAmount: accountFeeAmount, paymentStatus },
+  })
+
+  return NextResponse.json({
+    studentId,
+    paymentStatus,
+    ...getStudentFeeBalances(accountFeeAmount, totalPaid),
+  })
 }

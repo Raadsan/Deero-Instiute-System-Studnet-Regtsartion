@@ -77,7 +77,7 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
     prisma.user.count({ where: { role: "TEACHER", isActive: true } }),
     prisma.class.count(),
     prisma.student.count({ where: { isActive: true, paymentStatus: "PAID" } }),
-    prisma.student.count({ where: { isActive: true, paymentStatus: "UNPAID", enrollmentStatus: "ENROLLED" } }),
+    prisma.student.count({ where: { isActive: true, paymentStatus: { in: ["UNPAID", "PARTIAL"] }, enrollmentStatus: "ENROLLED" } }),
     prisma.student.count({ where: { isActive: true, enrollmentStatus: "VISIT_SCHEDULED" } }),
     prisma.student.count({ where: { isActive: true, enrollmentStatus: "ENROLLED" } }),
     prisma.user.count({ where: { role: "REGISTRAR", isActive: true } }),
@@ -118,7 +118,7 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
     prisma.financeEntry.aggregate({ where: { type: "INCOME", occurredAt: dateFilter }, _sum: { amount: true } }),
     prisma.financeEntry.aggregate({ where: { type: "EXPENSE", occurredAt: dateFilter }, _sum: { amount: true } }),
     prisma.student.findMany({
-      where: { isActive: true, paymentStatus: "UNPAID", enrollmentStatus: "ENROLLED" },
+      where: { isActive: true, paymentStatus: { in: ["UNPAID", "PARTIAL"] }, enrollmentStatus: "ENROLLED" },
       select: { id: true, firstName: true, lastName: true, phone: true, class: { select: { name: true } } },
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
       take: 100,

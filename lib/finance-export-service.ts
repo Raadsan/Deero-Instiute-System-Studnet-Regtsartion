@@ -39,7 +39,7 @@ export function buildFinanceSummaryCsv(summary: FinanceSummary) {
         ["Total Expenses", summary.overview.totalExpenses],
         ["Net Balance", summary.overview.netBalance],
         ["Outstanding Payables", summary.overview.outstandingPayables],
-        ["Unpaid Students", summary.overview.unpaidStudents],
+        ["Outstanding Students", summary.overview.unpaidStudents],
       ],
     },
     {
@@ -48,7 +48,7 @@ export function buildFinanceSummaryCsv(summary: FinanceSummary) {
         ["Metric", "Value"],
         ["Total Collected", summary.studentFees.totalCollected],
         ["Collected This Month", summary.studentFees.monthlyCollected],
-        ["Unpaid Students", summary.studentFees.unpaidStudents],
+        ["Outstanding Students", summary.studentFees.unpaidStudents],
       ],
     },
     {
@@ -132,7 +132,7 @@ export async function buildFinanceSummaryPdf(summary: FinanceSummary) {
       { label: "Net Balance", value: formatMoney(summary.overview.netBalance), highlight: true },
       { label: "Outstanding Payables", value: formatMoney(summary.overview.outstandingPayables) },
       { label: "Student Fees Collected", value: formatMoney(summary.studentFees.totalCollected) },
-      { label: "Unpaid Students", value: String(summary.studentFees.unpaidStudents) },
+      { label: "Outstanding Students", value: String(summary.studentFees.unpaidStudents) },
       { label: "Teacher Payroll Due", value: formatMoney(summary.teacherPayroll.monthlyPay) },
       { label: "Staff Payroll Due", value: formatMoney(summary.staffPayroll.monthlyPayroll) },
       { label: "Partner Monthly Due", value: formatMoney(summary.partners.monthlyDue) },

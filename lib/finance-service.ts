@@ -25,7 +25,7 @@ export async function getFinanceSummary() {
       where: { paidAt: { gte: monthStart, lt: nextMonthStart } },
       _sum: { amount: true },
     }),
-    prisma.student.count({ where: { isActive: true, paymentStatus: "UNPAID" } }),
+    prisma.student.count({ where: { isActive: true, paymentStatus: { in: ["UNPAID", "PARTIAL"] } } }),
     mapPartners(true).then((partners) => ({
       partners,
       monthlyDue: partners.reduce((sum, row) => sum + row.monthlyDue, 0),

@@ -138,7 +138,7 @@ const attendanceChartConfig = {
 
 const paymentChartConfig = {
   paid: { label: "Paid", color: "var(--chart-1)" },
-  unpaid: { label: "Unpaid", color: "var(--chart-2)" },
+  unpaid: { label: "Outstanding", color: "var(--chart-2)" },
 } satisfies ChartConfig
 
 function getErrorMessage(error: unknown) {
@@ -334,7 +334,7 @@ export default function ReportsView() {
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Reports & System Overview</h1>
             <p className="text-sm sm:text-base text-muted-foreground max-w-2xl">
-              Full school overview — students, attendance, fees, teachers, partners, unpaid students, visits, and transactions.
+              Full school overview — students, attendance, fees, teachers, partners, outstanding balances, visits, and transactions.
             </p>
           </div>
           <div className="flex w-full lg:w-auto flex-wrap gap-2 shrink-0">
@@ -423,7 +423,7 @@ export default function ReportsView() {
               iconBg="bg-[#003D9E]"
             />
             <MetricCard
-              label="Unpaid Students"
+              label="Outstanding Students"
               value={report.overview.unpaidStudents.toLocaleString()}
               hint={`${report.overview.paidStudents} paid this cycle`}
               icon={Wallet}
@@ -499,7 +499,7 @@ export default function ReportsView() {
                 <div className="px-6 pt-6 pb-2 flex items-start justify-between gap-4">
                   <div className="space-y-1">
                     <h3 className="font-semibold text-base text-foreground tracking-tight">Payment Status</h3>
-                    <p className="text-sm text-muted-foreground">Paid vs unpaid enrolled students</p>
+                    <p className="text-sm text-muted-foreground">Paid vs enrolled students with an outstanding balance</p>
                   </div>
                   <div className="shrink-0 p-2.5 rounded-xl bg-primary/8 text-primary">
                     <Wallet className="w-4 h-4" />
@@ -510,7 +510,7 @@ export default function ReportsView() {
                     <MoneyTile label="Student Fees This Month" value={formatMoney(report.money.studentFeesThisMonth)} tone="accent" />
                     <div className="grid grid-cols-2 gap-4">
                       <MoneyTile label="Paid" value={String(report.overview.paidStudents)} tone="income" />
-                      <MoneyTile label="Unpaid" value={String(report.overview.unpaidStudents)} tone="expense" />
+                      <MoneyTile label="Outstanding" value={String(report.overview.unpaidStudents)} tone="expense" />
                     </div>
                   </div>
                   <div className="lg:col-span-7">
@@ -597,7 +597,7 @@ export default function ReportsView() {
               <div className="grid grid-cols-1 gap-6">
                 <Card className="overflow-hidden">
                   <div className="px-6 py-4 border-b">
-                    <h3 className="font-semibold">Unpaid Students ({report.unpaidStudents.length})</h3>
+                    <h3 className="font-semibold">Outstanding Students ({report.unpaidStudents.length})</h3>
                     <p className="text-sm text-muted-foreground">Enrolled but payment not received</p>
                   </div>
                   <div className="overflow-x-auto">
@@ -611,7 +611,7 @@ export default function ReportsView() {
                       </TableHeader>
                       <TableBody>
                         {report.unpaidStudents.length === 0 ? (
-                          <TableRow><TableCell colSpan={3} className="text-muted-foreground">No unpaid students</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={3} className="text-muted-foreground">No outstanding students</TableCell></TableRow>
                         ) : (
                           report.unpaidStudents.map((row) => (
                             <TableRow key={row.id}>

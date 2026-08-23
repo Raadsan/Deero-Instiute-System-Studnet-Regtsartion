@@ -26,22 +26,30 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 type ClassOption = { id: string; name: string; level: string | null }
+type PaymentStatus = "PAID" | "PARTIAL" | "UNPAID"
 type ClassSummary = {
   classId: string | null
   className: string
   totalCollected: number
   paymentCount: number
   paidStudents: number
+  partialStudents: number
   unpaidStudents: number
   totalStudents: number
+  totalFees: number
+  outstandingBalance: number
+  creditBalance: number
 }
 type StudentLedger = {
   id: string
   firstName: string
   lastName: string
-  paymentStatus: "PAID" | "UNPAID"
+  paymentStatus: PaymentStatus
   class: ClassOption | null
+  feeAmount: number
   totalPaid: number
+  remainingBalance: number
+  creditBalance: number
   paymentCount: number
   lastPaidAt: string | null
 }
@@ -63,7 +71,7 @@ type PaymentRow = {
     id: string
     firstName: string
     lastName: string
-    paymentStatus: "PAID" | "UNPAID"
+    paymentStatus: PaymentStatus
     class: ClassOption | null
   } | null
 }
@@ -73,8 +81,13 @@ type PaymentsSummary = {
     monthlyCollected: number
     paymentCount: number
     paidStudents: number
+    partialStudents: number
     unpaidStudents: number
+    outstandingStudents: number
     totalStudents: number
+    totalFees: number
+    outstandingBalance: number
+    creditBalance: number
   }
   byClass: ClassSummary[]
   studentLedgers: StudentLedger[]
@@ -91,7 +104,19 @@ function getErrorMessage(error: any) {
 }
 
 function formatCurrency(value: number, currency = "USD") {
-  return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 0 }).format(value)
+  return new Intl.NumberFormat(undefined, { style: "currency", currency, maximumFractionDigits: 2 }).format(value)
+}
+
+function paymentStatusLabel(status: PaymentStatus) {
+  if (status === "PAID") return "Paid"
+  if (status === "PARTIAL") return "Partial"
+  return "Unpaid"
+}
+
+function paymentStatusClass(status: PaymentStatus) {
+  if (status === "PAID") return "rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
+  if (status === "PARTIAL") return "rounded-full bg-blue-50 text-blue-700 border border-blue-200"
+  return "rounded-full bg-amber-50 text-amber-700 border border-amber-200"
 }
 
 function formatPersonName(firstName: string, lastName: string) {
@@ -120,6 +145,7 @@ export default function PaymentsView() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [selectedStudentId, setSelectedStudentId] = useState("")
   const [studentSearch, setStudentSearch] = useState("")
+  const [feeAmount, setFeeAmount] = useState("")
   const [amount, setAmount] = useState("")
   const [note, setNote] = useState("")
   const [saving, setSaving] = useState(false)
@@ -155,8 +181,8 @@ export default function PaymentsView() {
     })
   }, [summary?.studentLedgers, search])
 
-  const unpaidStudents = useMemo(
-    () => filteredLedgers.filter((s) => s.paymentStatus === "UNPAID"),
+  const outstandingStudents = useMemo(
+    () => filteredLedgers.filter((s) => s.paymentStatus !== "PAID"),
     [filteredLedgers],
   )
 
@@ -167,7 +193,7 @@ export default function PaymentsView() {
   }, [summary?.byClass, classFilter])
 
   const dialogStudents = useMemo(() => {
-    return (summary?.studentLedgers ?? []).filter((s) => s.paymentStatus === "UNPAID")
+    return (summary?.studentLedgers ?? []).filter((s) => s.paymentStatus !== "PAID")
   }, [summary?.studentLedgers])
 
   const filteredDialogStudents = useMemo(() => {
@@ -180,12 +206,25 @@ export default function PaymentsView() {
     })
   }, [dialogStudents, studentSearch])
 
+  const selectedStudent = useMemo(
+    () => summary?.studentLedgers.find((student) => student.id === selectedStudentId) ?? null,
+    [selectedStudentId, summary?.studentLedgers],
+  )
+
   const openDialog = (studentId?: string) => {
+    const student = studentId ? summary?.studentLedgers.find((row) => row.id === studentId) : null
     setDialogOpen(true)
     setSelectedStudentId(studentId ?? "")
+    setFeeAmount(student?.feeAmount ? String(student.feeAmount) : "")
     setAmount("")
     setNote("")
     setStudentSearch("")
+  }
+
+  const selectDialogStudent = (studentId: string) => {
+    const student = summary?.studentLedgers.find((row) => row.id === studentId)
+    setSelectedStudentId(studentId)
+    setFeeAmount(student?.feeAmount ? String(student.feeAmount) : "")
   }
 
   const submitPayment = async () => {
@@ -193,20 +232,39 @@ export default function PaymentsView() {
       toast({ title: "Select a student", variant: "destructive" })
       return
     }
-    const numericAmount = Number(amount)
-    if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+    const numericAmount = amount.trim() ? Number(amount) : 0
+    if (!Number.isFinite(numericAmount) || numericAmount < 0) {
       toast({ title: "Enter a valid amount", variant: "destructive" })
+      return
+    }
+    const numericFeeAmount = Number(feeAmount)
+    if (!Number.isFinite(numericFeeAmount) || numericFeeAmount <= 0) {
+      toast({ title: "Enter the total fee", variant: "destructive" })
       return
     }
 
     setSaving(true)
     try {
-      await api.post("/api/payments", {
-        studentId: selectedStudentId,
-        amount: numericAmount,
-        note: note.trim() ? note.trim() : null,
+      const res = numericAmount > 0
+        ? await api.post("/api/payments", {
+            studentId: selectedStudentId,
+            amount: numericAmount,
+            feeAmount: numericFeeAmount,
+            note: note.trim() ? note.trim() : null,
+          })
+        : await api.patch("/api/payments", {
+            studentId: selectedStudentId,
+            feeAmount: numericFeeAmount,
+          })
+      toast({
+        title: numericAmount > 0 ? "Payment recorded" : "Total fee saved",
+        description:
+          res.data.remainingBalance > 0
+            ? `${formatCurrency(res.data.remainingBalance)} remaining.`
+            : res.data.creditBalance > 0
+              ? `${formatCurrency(res.data.creditBalance)} credit on the account.`
+              : "The fee is fully paid.",
       })
-      toast({ title: "Payment recorded" })
       setDialogOpen(false)
       await fetchData()
     } catch (e: any) {
@@ -230,7 +288,7 @@ export default function PaymentsView() {
                 {totals?.paymentCount ?? 0} payment{(totals?.paymentCount ?? 0) === 1 ? "" : "s"}
               </div>
               <div className="inline-flex items-center gap-2 rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-medium text-rose-700">
-                {totals?.unpaidStudents ?? 0} unpaid
+                {totals?.outstandingStudents ?? 0} owing a balance
               </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Payments & Fees</h1>
@@ -275,6 +333,7 @@ export default function PaymentsView() {
               <SelectContent className={selectContentClass} position="popper">
                 <SelectItem value={ALL_STATUSES}>All students</SelectItem>
                 <SelectItem value="PAID">Paid only</SelectItem>
+                <SelectItem value="PARTIAL">Partial only</SelectItem>
                 <SelectItem value="UNPAID">Unpaid only</SelectItem>
               </SelectContent>
             </Select>
@@ -303,7 +362,7 @@ export default function PaymentsView() {
         <Card className="p-6 text-sm bg-destructive/5 text-destructive border-destructive/20 shadow-sm">{error}</Card>
       ) : (
         <>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
             <Card className="relative overflow-hidden p-5 border-muted/50 shadow-sm">
               <div className="absolute inset-x-0 top-0 h-1 bg-[#003D9E]" />
               <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total Collected</p>
@@ -311,6 +370,14 @@ export default function PaymentsView() {
                 {formatCurrency(totals?.totalCollected ?? 0)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">All recorded payments</p>
+            </Card>
+            <Card className="relative overflow-hidden p-5 border-muted/50 shadow-sm">
+              <div className="absolute inset-x-0 top-0 h-1 bg-[#EC4724]" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Outstanding Balance</p>
+              <p className="text-2xl sm:text-3xl font-bold text-[#EC4724] tabular-nums mt-1">
+                {formatCurrency(totals?.outstandingBalance ?? 0)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">Still owed by students</p>
             </Card>
             <Card className="relative overflow-hidden p-5 border-muted/50 shadow-sm">
               <div className="absolute inset-x-0 top-0 h-1 bg-emerald-500" />
@@ -328,9 +395,9 @@ export default function PaymentsView() {
             </Card>
             <Card className="relative overflow-hidden p-5 border-muted/50 shadow-sm">
               <div className="absolute inset-x-0 top-0 h-1 bg-[#EC4724]" />
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Unpaid Students</p>
-              <p className="text-2xl sm:text-3xl font-bold text-[#EC4724] tabular-nums mt-1">{totals?.unpaidStudents ?? 0}</p>
-              <p className="text-xs text-muted-foreground mt-1">Still need to pay</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Outstanding Students</p>
+              <p className="text-2xl sm:text-3xl font-bold text-[#EC4724] tabular-nums mt-1">{totals?.outstandingStudents ?? 0}</p>
+              <p className="text-xs text-muted-foreground mt-1">{totals?.partialStudents ?? 0} partial / {totals?.unpaidStudents ?? 0} unpaid</p>
             </Card>
           </div>
 
@@ -349,15 +416,17 @@ export default function PaymentsView() {
                     <TableHead className="pl-6 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Class</TableHead>
                     <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Students</TableHead>
                     <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Paid</TableHead>
+                    <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Partial</TableHead>
                     <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Unpaid</TableHead>
                     <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Payments</TableHead>
-                    <TableHead className="pr-6 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">Total Collected</TableHead>
+                    <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">Collected</TableHead>
+                    <TableHead className="pr-6 font-semibold text-xs uppercase tracking-wider text-muted-foreground text-right">Outstanding</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredClassRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="py-10 text-center text-muted-foreground text-sm">
+                      <TableCell colSpan={8} className="py-10 text-center text-muted-foreground text-sm">
                         No class payment data yet.
                       </TableCell>
                     </TableRow>
@@ -367,10 +436,14 @@ export default function PaymentsView() {
                         <TableCell className="pl-6 py-4 font-semibold">{row.className}</TableCell>
                         <TableCell className="py-4">{row.totalStudents}</TableCell>
                         <TableCell className="py-4 text-emerald-700 font-medium">{row.paidStudents}</TableCell>
+                        <TableCell className="py-4 text-blue-700 font-medium">{row.partialStudents}</TableCell>
                         <TableCell className="py-4 text-amber-700 font-medium">{row.unpaidStudents}</TableCell>
                         <TableCell className="py-4">{row.paymentCount}</TableCell>
-                        <TableCell className="py-4 pr-6 text-right font-bold tabular-nums text-[#003D9E]">
+                        <TableCell className="py-4 text-right font-bold tabular-nums text-[#003D9E]">
                           {formatCurrency(row.totalCollected)}
+                        </TableCell>
+                        <TableCell className="py-4 pr-6 text-right font-bold tabular-nums text-[#EC4724]">
+                          {formatCurrency(row.outstandingBalance)}
                         </TableCell>
                       </TableRow>
                     ))
@@ -388,7 +461,7 @@ export default function PaymentsView() {
               </TabsTrigger>
               <TabsTrigger value="unpaid" className="gap-1.5">
                 <AlertCircle className="w-4 h-4" />
-                Unpaid ({unpaidStudents.length})
+                Outstanding ({outstandingStudents.length})
               </TabsTrigger>
               <TabsTrigger value="transactions" className="gap-1.5">
                 <Receipt className="w-4 h-4" />
@@ -400,7 +473,7 @@ export default function PaymentsView() {
               <div className="rounded-xl border border-muted/50 bg-card shadow-sm overflow-hidden">
                 <div className="px-4 sm:px-6 py-4 border-b bg-muted/20">
                   <h2 className="text-lg font-bold tracking-tight">Student Payment Accounts</h2>
-                  <p className="text-sm text-muted-foreground">Each student and how much they have paid</p>
+                  <p className="text-sm text-muted-foreground">Total fee, payments received, and the exact balance for every student</p>
                 </div>
                 <div className="overflow-x-auto">
                   <Table>
@@ -408,9 +481,9 @@ export default function PaymentsView() {
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="pl-6 min-w-[180px]">Student</TableHead>
                         <TableHead className="hidden md:table-cell">Class</TableHead>
-                        <TableHead>Total Paid</TableHead>
-                        <TableHead className="hidden sm:table-cell">Payments</TableHead>
-                        <TableHead className="hidden lg:table-cell">Last Payment</TableHead>
+                        <TableHead>Total Fee</TableHead>
+                        <TableHead>Paid</TableHead>
+                        <TableHead>Balance</TableHead>
                         <TableHead className="text-center">Status</TableHead>
                         <TableHead className="pr-6 text-right">Action</TableHead>
                       </TableRow>
@@ -437,26 +510,26 @@ export default function PaymentsView() {
                                 "—"
                               )}
                             </TableCell>
-                            <TableCell className="py-4 font-semibold tabular-nums">{formatCurrency(student.totalPaid)}</TableCell>
-                            <TableCell className="hidden sm:table-cell py-4">{student.paymentCount}</TableCell>
-                            <TableCell className="hidden lg:table-cell py-4 text-sm text-muted-foreground">
-                              {formatDate(student.lastPaidAt)}
+                            <TableCell className="py-4 tabular-nums">{formatCurrency(student.feeAmount)}</TableCell>
+                            <TableCell className="py-4 font-semibold tabular-nums text-[#003D9E]">{formatCurrency(student.totalPaid)}</TableCell>
+                            <TableCell className="py-4 font-semibold tabular-nums">
+                              {student.creditBalance > 0 ? (
+                                <span className="text-emerald-700">Credit {formatCurrency(student.creditBalance)}</span>
+                              ) : (
+                                <span className={student.remainingBalance > 0 ? "text-[#EC4724]" : "text-emerald-700"}>
+                                  {formatCurrency(student.remainingBalance)}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell className="py-4 text-center">
-                              <Badge
-                                className={
-                                  student.paymentStatus === "PAID"
-                                    ? "rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                    : "rounded-full bg-amber-50 text-amber-700 border border-amber-200"
-                                }
-                              >
-                                {student.paymentStatus === "PAID" ? "Paid" : "Unpaid"}
+                              <Badge className={paymentStatusClass(student.paymentStatus)}>
+                                {paymentStatusLabel(student.paymentStatus)}
                               </Badge>
                             </TableCell>
                             <TableCell className="py-4 pr-6 text-right">
-                              {student.paymentStatus === "UNPAID" && (
+                              {student.paymentStatus !== "PAID" && (
                                 <Button size="sm" variant="outline" className="rounded-full" onClick={() => openDialog(student.id)}>
-                                  Record
+                                  {student.feeAmount > 0 ? "Record" : "Set Fee"}
                                 </Button>
                               )}
                             </TableCell>
@@ -472,9 +545,9 @@ export default function PaymentsView() {
             <TabsContent value="unpaid">
               <div className="rounded-xl border border-amber-200/60 bg-card shadow-sm overflow-hidden">
                 <div className="px-4 sm:px-6 py-4 border-b bg-amber-50/50">
-                  <h2 className="text-lg font-bold tracking-tight text-amber-900">Unpaid Students</h2>
+                  <h2 className="text-lg font-bold tracking-tight text-amber-900">Outstanding Student Balances</h2>
                   <p className="text-sm text-muted-foreground">
-                    Students who have not paid yet{classFilter !== ALL_CLASSES ? " in this class" : ""}.
+                    Students who still owe all or part of their fee{classFilter !== ALL_CLASSES ? " in this class" : ""}.
                   </p>
                 </div>
                 <div className="overflow-x-auto">
@@ -483,30 +556,36 @@ export default function PaymentsView() {
                       <TableRow className="hover:bg-transparent">
                         <TableHead className="pl-6">Student</TableHead>
                         <TableHead className="hidden md:table-cell">Class</TableHead>
+                        <TableHead>Total Fee</TableHead>
+                        <TableHead>Paid</TableHead>
+                        <TableHead>Balance</TableHead>
                         <TableHead className="text-center">Status</TableHead>
                         <TableHead className="pr-6 text-right">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {unpaidStudents.length === 0 ? (
+                      {outstandingStudents.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={4} className="py-10 text-center text-muted-foreground text-sm">
-                            No unpaid students in this filter. Great job!
+                          <TableCell colSpan={7} className="py-10 text-center text-muted-foreground text-sm">
+                            No outstanding student balances in this filter.
                           </TableCell>
                         </TableRow>
                       ) : (
-                        unpaidStudents.map((student) => (
+                        outstandingStudents.map((student) => (
                           <TableRow key={student.id} className="hover:bg-muted/40">
                             <TableCell className="pl-6 py-4 font-semibold">
                               {formatPersonName(student.firstName, student.lastName)}
                             </TableCell>
                             <TableCell className="hidden md:table-cell py-4 capitalize">{student.class?.name ?? "—"}</TableCell>
+                            <TableCell className="py-4 tabular-nums">{formatCurrency(student.feeAmount)}</TableCell>
+                            <TableCell className="py-4 font-semibold tabular-nums text-[#003D9E]">{formatCurrency(student.totalPaid)}</TableCell>
+                            <TableCell className="py-4 font-bold tabular-nums text-[#EC4724]">{formatCurrency(student.remainingBalance)}</TableCell>
                             <TableCell className="py-4 text-center">
-                              <Badge className="rounded-full bg-amber-50 text-amber-700 border border-amber-200">Unpaid</Badge>
+                              <Badge className={paymentStatusClass(student.paymentStatus)}>{paymentStatusLabel(student.paymentStatus)}</Badge>
                             </TableCell>
                             <TableCell className="py-4 pr-6 text-right">
                               <Button size="sm" className="rounded-full" onClick={() => openDialog(student.id)}>
-                                Record Payment
+                                {student.feeAmount > 0 ? "Record Payment" : "Set Total Fee"}
                               </Button>
                             </TableCell>
                           </TableRow>
@@ -537,7 +616,7 @@ export default function PaymentsView() {
                         <TableHead className="hidden md:table-cell">Date</TableHead>
                         <TableHead className="hidden lg:table-cell">Note</TableHead>
                         <TableHead className="hidden xl:table-cell">Recorded By</TableHead>
-                        <TableHead className="pr-6 text-center">Status</TableHead>
+                        <TableHead className="pr-6 text-center">Account Status</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -571,7 +650,13 @@ export default function PaymentsView() {
                               {payment.recordedBy?.name ?? "Unknown"}
                             </TableCell>
                             <TableCell className="py-4 pr-6 text-center">
-                              <Badge className="rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">Paid</Badge>
+                              {payment.student ? (
+                                <Badge className={paymentStatusClass(payment.student.paymentStatus)}>
+                                  {paymentStatusLabel(payment.student.paymentStatus)}
+                                </Badge>
+                              ) : (
+                                "—"
+                              )}
                             </TableCell>
                           </TableRow>
                         ))
@@ -589,15 +674,15 @@ export default function PaymentsView() {
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Record Payment</DialogTitle>
-            <DialogDescription>Select a student and enter the amount. They will be marked as Paid.</DialogDescription>
+            <DialogDescription>Enter the total fee and, when money is received, the installment amount. The remaining balance is calculated automatically.</DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Student</Label>
-              <Select value={selectedStudentId} onValueChange={setSelectedStudentId}>
+              <Select value={selectedStudentId} onValueChange={selectDialogStudent}>
                 <SelectTrigger className="w-full h-11 bg-background">
-                  <SelectValue placeholder="Select unpaid student" />
+                  <SelectValue placeholder="Select student with a balance" />
                 </SelectTrigger>
                 <SelectContent className={selectContentClass} position="popper">
                   <div className="px-2 pt-2 pb-1 border-b bg-background sticky top-0 z-10">
@@ -617,26 +702,57 @@ export default function PaymentsView() {
                       </SelectItem>
                     ))
                   ) : (
-                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">No unpaid students found</div>
+                    <div className="px-3 py-4 text-sm text-muted-foreground text-center">No outstanding students found</div>
                   )}
                 </SelectContent>
               </Select>
             </div>
 
+            {selectedStudent && (
+              <div className="grid grid-cols-3 gap-3 rounded-lg border bg-muted/20 p-3 text-sm">
+                <div>
+                  <p className="text-xs text-muted-foreground">Fee</p>
+                  <p className="font-semibold tabular-nums">{formatCurrency(selectedStudent.feeAmount)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Paid</p>
+                  <p className="font-semibold tabular-nums text-[#003D9E]">{formatCurrency(selectedStudent.totalPaid)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Balance</p>
+                  <p className="font-semibold tabular-nums text-[#EC4724]">{formatCurrency(selectedStudent.remainingBalance)}</p>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="amount">Amount (USD)</Label>
+                <Label htmlFor="feeAmount">Total Fee (USD)</Label>
+                <Input
+                  id="feeAmount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  value={feeAmount}
+                  onChange={(e) => setFeeAmount(e.target.value)}
+                  placeholder="e.g. 55"
+                  className="h-11 bg-background"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="amount">Paid Now (USD) <span className="font-normal text-muted-foreground">(optional)</span></Label>
                 <Input
                   id="amount"
                   type="number"
-                  min="1"
+                  min="0.01"
+                  step="0.01"
                   value={amount}
                   onChange={(e) => setAmount(e.target.value)}
                   placeholder="e.g. 50"
                   className="h-11 bg-background"
                 />
               </div>
-              <div className="space-y-2">
+              <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="note">
                   Note <span className="text-muted-foreground font-normal">(optional)</span>
                 </Label>
@@ -662,7 +778,7 @@ export default function PaymentsView() {
                   Saving...
                 </>
               ) : (
-                "Record Payment"
+                amount.trim() ? "Record Payment" : "Save Total Fee"
               )}
             </Button>
           </DialogFooter>

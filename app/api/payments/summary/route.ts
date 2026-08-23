@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
 import { mapRecordedBy, recordedBySelect } from "@/lib/recorded-by"
+import { getStudentFeeBalances } from "@/lib/student-fees"
 import type { Prisma } from "@/lib/generated/prisma/client"
 
 function startOfMonth(date: Date) {
@@ -21,22 +22,21 @@ export async function GET(req: Request) {
   const classId = searchParams.get("classId")
   const paymentStatus = searchParams.get("paymentStatus")
 
-  if (paymentStatus && paymentStatus !== "PAID" && paymentStatus !== "UNPAID") {
+  if (paymentStatus && paymentStatus !== "PAID" && paymentStatus !== "PARTIAL" && paymentStatus !== "UNPAID") {
     return NextResponse.json({ message: "Invalid paymentStatus" }, { status: 400 })
   }
-  const normalizedPaymentStatus = paymentStatus as "PAID" | "UNPAID" | null
+  const normalizedPaymentStatus = paymentStatus as "PAID" | "PARTIAL" | "UNPAID" | null
 
   const studentWhere: Prisma.StudentWhereInput = { isActive: true }
   if (classId) studentWhere.classId = classId
   if (normalizedPaymentStatus) studentWhere.paymentStatus = normalizedPaymentStatus
 
-  const paymentWhere: Prisma.PaymentWhereInput = {}
-  if (classId || normalizedPaymentStatus) {
-    paymentWhere.student = {
+  const paymentWhere: Prisma.PaymentWhereInput = {
+    student: {
       isActive: true,
       ...(classId ? { classId } : {}),
       ...(normalizedPaymentStatus ? { paymentStatus: normalizedPaymentStatus } : {}),
-    }
+    },
   }
 
   const now = new Date()
@@ -53,6 +53,7 @@ export async function GET(req: Request) {
     paymentCount,
     allStudentsForClassStats,
     allPaymentsForClassStats,
+    allBalancesForClassStats,
   ] = await Promise.all([
     prisma.class.findMany({
       where: { isActive: true },
@@ -65,6 +66,7 @@ export async function GET(req: Request) {
         id: true,
         firstName: true,
         lastName: true,
+        feeAmount: true,
         paymentStatus: true,
         classId: true,
         class: { select: { id: true, name: true, level: true } },
@@ -111,11 +113,26 @@ export async function GET(req: Request) {
       by: ["classId", "paymentStatus"],
       where: { isActive: true },
       _count: { _all: true },
+      _sum: { feeAmount: true },
     }),
     prisma.$queryRaw<Array<{ classId: string | null; total: number; count: bigint }>>`
       SELECT s."classId", COALESCE(SUM(p.amount), 0)::float AS total, COUNT(p.id) AS count
       FROM "Payment" p
       INNER JOIN "Student" s ON p."studentId" = s.id
+      WHERE s."isActive" = true
+      GROUP BY s."classId"
+    `,
+    prisma.$queryRaw<Array<{ classId: string | null; outstanding: number; credit: number }>>`
+      SELECT
+        s."classId",
+        COALESCE(SUM(GREATEST(s."feeAmount" - COALESCE(p.total_paid, 0), 0)), 0)::float AS outstanding,
+        COALESCE(SUM(GREATEST(COALESCE(p.total_paid, 0) - s."feeAmount", 0)), 0)::float AS credit
+      FROM "Student" s
+      LEFT JOIN (
+        SELECT "studentId", SUM(amount) AS total_paid
+        FROM "Payment"
+        GROUP BY "studentId"
+      ) p ON p."studentId" = s.id
       WHERE s."isActive" = true
       GROUP BY s."classId"
     `,
@@ -132,17 +149,18 @@ export async function GET(req: Request) {
     ]),
   )
 
-  const classNameMap = new Map(classes.map((c) => [c.id, c.name]))
-  classNameMap.set("__none__", "No Class")
-
   type ClassBucket = {
     classId: string | null
     className: string
     totalCollected: number
     paymentCount: number
     paidStudents: number
+    partialStudents: number
     unpaidStudents: number
     totalStudents: number
+    totalFees: number
+    outstandingBalance: number
+    creditBalance: number
   }
 
   const classBuckets = new Map<string, ClassBucket>()
@@ -154,8 +172,12 @@ export async function GET(req: Request) {
       totalCollected: 0,
       paymentCount: 0,
       paidStudents: 0,
+      partialStudents: 0,
       unpaidStudents: 0,
       totalStudents: 0,
+      totalFees: 0,
+      outstandingBalance: 0,
+      creditBalance: 0,
     })
   }
 
@@ -165,8 +187,12 @@ export async function GET(req: Request) {
     totalCollected: 0,
     paymentCount: 0,
     paidStudents: 0,
+    partialStudents: 0,
     unpaidStudents: 0,
     totalStudents: 0,
+    totalFees: 0,
+    outstandingBalance: 0,
+    creditBalance: 0,
   })
 
   for (const row of allStudentsForClassStats) {
@@ -174,7 +200,9 @@ export async function GET(req: Request) {
     const bucket = classBuckets.get(key)
     if (!bucket) continue
     bucket.totalStudents += row._count._all
+    bucket.totalFees += Number(row._sum.feeAmount ?? 0)
     if (row.paymentStatus === "PAID") bucket.paidStudents += row._count._all
+    else if (row.paymentStatus === "PARTIAL") bucket.partialStudents += row._count._all
     else bucket.unpaidStudents += row._count._all
   }
 
@@ -186,26 +214,39 @@ export async function GET(req: Request) {
     bucket.paymentCount += Number(row.count ?? 0)
   }
 
+  for (const row of allBalancesForClassStats) {
+    const key = row.classId ?? "__none__"
+    const bucket = classBuckets.get(key)
+    if (!bucket) continue
+    bucket.outstandingBalance = Number(row.outstanding ?? 0)
+    bucket.creditBalance = Number(row.credit ?? 0)
+  }
+
   const byClass = Array.from(classBuckets.values())
     .filter((row) => row.totalStudents > 0 || row.totalCollected > 0)
     .sort((a, b) => b.totalCollected - a.totalCollected)
 
   const studentLedgers = students.map((student) => {
     const stats = studentPaymentMap.get(student.id)
+    const balances = getStudentFeeBalances(student.feeAmount, stats?.totalPaid ?? 0)
     return {
       id: student.id,
       firstName: student.firstName,
       lastName: student.lastName,
       paymentStatus: student.paymentStatus,
       class: student.class ?? null,
-      totalPaid: stats?.totalPaid ?? 0,
+      ...balances,
       paymentCount: stats?.paymentCount ?? 0,
       lastPaidAt: stats?.lastPaidAt ?? null,
     }
   })
 
   const paidStudents = students.filter((s) => s.paymentStatus === "PAID").length
+  const partialStudents = students.filter((s) => s.paymentStatus === "PARTIAL").length
   const unpaidStudents = students.filter((s) => s.paymentStatus === "UNPAID").length
+  const outstandingBalance = studentLedgers.reduce((sum, student) => sum + student.remainingBalance, 0)
+  const creditBalance = studentLedgers.reduce((sum, student) => sum + student.creditBalance, 0)
+  const totalFees = studentLedgers.reduce((sum, student) => sum + student.feeAmount, 0)
 
   const recentPayments = payments.map((p) => ({
     id: p.id,
@@ -231,8 +272,13 @@ export async function GET(req: Request) {
       monthlyCollected: Number(monthlyAgg._sum.amount ?? 0),
       paymentCount,
       paidStudents,
+      partialStudents,
       unpaidStudents,
+      outstandingStudents: partialStudents + unpaidStudents,
       totalStudents: students.length,
+      totalFees,
+      outstandingBalance,
+      creditBalance,
     },
     byClass,
     studentLedgers,

@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 type ClassOption = { id: string; name: string; level: string | null; isActive: boolean }
+type PaymentStatus = "PAID" | "PARTIAL" | "UNPAID"
 type StudentRow = {
   id: string
   firstName: string
@@ -37,7 +38,8 @@ type StudentRow = {
   phone: string | null
   email: string | null
   gender: string | null
-  paymentStatus: "PAID" | "UNPAID"
+  feeAmount: number
+  paymentStatus: PaymentStatus
   enrollmentStatus: "ENROLLED" | "VISIT_SCHEDULED"
   visitDate: string | null
   visitNote: string | null
@@ -47,6 +49,8 @@ type StudentRow = {
   registeredById: string | null
   registeredBy: { id: string; name: string } | null
   totalPaid?: number
+  remainingBalance?: number
+  creditBalance?: number
   paymentCount?: number
 }
 
@@ -66,8 +70,10 @@ function formatPersonName(firstName: string, lastName: string) {
   return `${format(firstName)} ${format(lastName)}`.trim()
 }
 
-function paymentLabel(status: "PAID" | "UNPAID") {
-  return status === "PAID" ? "Paid" : "Unpaid"
+function paymentLabel(status: PaymentStatus) {
+  if (status === "PAID") return "Paid"
+  if (status === "PARTIAL") return "Partial"
+  return "Unpaid"
 }
 
 function formatCurrency(value: number) {
@@ -88,18 +94,27 @@ function buildStudentPayload(args: {
   phone: string
   gender: string
   classId: string
-  paymentStatus: "PAID" | "UNPAID"
+  paymentStatus: PaymentStatus
   isActive: boolean
   enrollmentStatus: "ENROLLED" | "VISIT_SCHEDULED"
   visitDate: string
   visitNote: string
   paymentAmount?: string
+  feeAmount: string
   paymentNote?: string
 }) {
   const numericAmount = args.paymentAmount?.trim() ? Number(args.paymentAmount) : NaN
   const hasPayment = Number.isFinite(numericAmount) && numericAmount > 0
+  const numericFeeAmount = args.feeAmount.trim() ? Number(args.feeAmount) : 0
+  const normalizedFeeAmount = Number.isFinite(numericFeeAmount) && numericFeeAmount >= 0 ? numericFeeAmount : 0
   const derivedStatus =
-    args.enrollmentStatus === "VISIT_SCHEDULED" ? "UNPAID" : hasPayment ? "PAID" : args.paymentStatus
+    args.enrollmentStatus === "VISIT_SCHEDULED"
+      ? "UNPAID"
+      : hasPayment
+        ? normalizedFeeAmount > numericAmount
+          ? "PARTIAL"
+          : "PAID"
+        : args.paymentStatus
 
   return {
     firstName: args.firstName.trim(),
@@ -108,6 +123,7 @@ function buildStudentPayload(args: {
     phone: args.phone.trim() ? args.phone.trim() : null,
     gender: args.gender.trim() ? args.gender.trim() : null,
     classId: args.classId === NO_CLASS_VALUE ? null : args.classId,
+    feeAmount: normalizedFeeAmount,
     paymentStatus: derivedStatus,
     isActive: args.isActive,
     enrollmentStatus: args.enrollmentStatus,
@@ -156,24 +172,25 @@ export default function StudentsList() {
   const [phone, setPhone] = useState("")
   const [gender, setGender] = useState("")
   const [classId, setClassId] = useState<string>(NO_CLASS_VALUE)
-  const [paymentStatus, setPaymentStatus] = useState<"PAID" | "UNPAID">("UNPAID")
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("UNPAID")
   const [enrollmentStatus, setEnrollmentStatus] = useState<"ENROLLED" | "VISIT_SCHEDULED">("ENROLLED")
   const [visitDate, setVisitDate] = useState(formatVisitDateInput(getNextSaturday()))
   const [visitNote, setVisitNote] = useState("")
   const [paymentAmount, setPaymentAmount] = useState("")
+  const [feeAmount, setFeeAmount] = useState("")
   const [paymentNote, setPaymentNote] = useState("")
   const [isActive, setIsActive] = useState(true)
 
   const [quickPayOpen, setQuickPayOpen] = useState(false)
   const [quickPayStudent, setQuickPayStudent] = useState<StudentRow | null>(null)
   const [quickPayAmount, setQuickPayAmount] = useState("")
+  const [quickPayFeeAmount, setQuickPayFeeAmount] = useState("")
   const [quickPayNote, setQuickPayNote] = useState("")
   const [quickPaySaving, setQuickPaySaving] = useState(false)
 
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({})
-  const [paymentUpdating, setPaymentUpdating] = useState<Record<string, boolean>>({})
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [bulkImportOpen, setBulkImportOpen] = useState(false)
@@ -194,6 +211,7 @@ export default function StudentsList() {
     setVisitDate(formatVisitDateInput(getNextSaturday()))
     setVisitNote("")
     setPaymentAmount("")
+    setFeeAmount("")
     setPaymentNote("")
     setIsActive(true)
   }
@@ -220,6 +238,7 @@ export default function StudentsList() {
     )
     setVisitNote(student.visitNote ?? "")
     setPaymentAmount("")
+    setFeeAmount(student.feeAmount > 0 ? String(student.feeAmount) : "")
     setPaymentNote("")
     setIsActive(Boolean(student.isActive))
     setFormOpen(true)
@@ -306,10 +325,16 @@ export default function StudentsList() {
       return
     }
 
-    if (!editing && enrollmentStatus === "ENROLLED" && paymentStatus === "PAID" && !paymentAmount.trim()) {
+    const numericFeeAmount = feeAmount.trim() ? Number(feeAmount) : 0
+    if (!Number.isFinite(numericFeeAmount) || numericFeeAmount < 0) {
+      toast({ title: "Enter a valid total fee", variant: "destructive" })
+      return
+    }
+
+    if (paymentAmount.trim() && numericFeeAmount <= 0) {
       toast({
-        title: "Enter payment amount",
-        description: "If the student paid, enter the fee amount so it is recorded.",
+        title: "Enter the total fee",
+        description: "The total fee is needed to calculate the remaining balance.",
         variant: "destructive",
       })
       return
@@ -329,6 +354,7 @@ export default function StudentsList() {
         enrollmentStatus,
         visitDate,
         visitNote,
+        feeAmount,
         paymentAmount,
         paymentNote,
       })
@@ -341,11 +367,12 @@ export default function StudentsList() {
           phone,
           gender,
           classId,
-          paymentStatus: paymentAmount.trim() ? "PAID" : paymentStatus,
+          paymentStatus,
           isActive,
           enrollmentStatus,
           visitDate,
           visitNote,
+          feeAmount,
         })
         await api.patch(`/api/students/${editing.id}`, patchPayload)
 
@@ -354,6 +381,7 @@ export default function StudentsList() {
           await api.post("/api/payments", {
             studentId: editing.id,
             amount: numericAmount,
+            feeAmount: numericFeeAmount,
             note: paymentNote.trim() ? paymentNote.trim() : null,
           })
           toast({ title: "Student updated", description: "Payment recorded successfully." })
@@ -476,46 +504,17 @@ export default function StudentsList() {
     }
   }
 
-  const togglePaymentStatus = async (student: StudentRow) => {
-    if (paymentUpdating[student.id]) return
-
-    if (student.paymentStatus === "UNPAID") {
+  const togglePaymentStatus = (student: StudentRow) => {
+    if (student.paymentStatus !== "PAID") {
       setQuickPayStudent(student)
       setQuickPayAmount("")
+      setQuickPayFeeAmount(student.feeAmount > 0 ? String(student.feeAmount) : "")
       setQuickPayNote("")
       setQuickPayOpen(true)
       return
     }
 
-    const prevStatus = student.paymentStatus
-    setPaymentUpdating((cur) => ({ ...cur, [student.id]: true }))
-    setStudents((cur) => cur.map((s) => (s.id === student.id ? { ...s, paymentStatus: "UNPAID" } : s)))
-
-    try {
-      await api.patch(`/api/students/${student.id}`, {
-        firstName: student.firstName,
-        lastName: student.lastName,
-        email: student.email,
-        phone: student.phone,
-        gender: student.gender,
-        classId: student.classId,
-        paymentStatus: "UNPAID",
-        enrollmentStatus: student.enrollmentStatus ?? "ENROLLED",
-        visitDate: student.visitDate,
-        visitNote: student.visitNote,
-        isActive: student.isActive,
-      })
-      toast({ title: "Payment status updated to Unpaid" })
-    } catch (e: any) {
-      setStudents((cur) => cur.map((s) => (s.id === student.id ? { ...s, paymentStatus: prevStatus } : s)))
-      toast({ title: "Update failed", description: getErrorMessage(e), variant: "destructive" })
-    } finally {
-      setPaymentUpdating((cur) => {
-        const next = { ...cur }
-        delete next[student.id]
-        return next
-      })
-    }
+    toast({ title: "Account is fully paid", description: "Payment status is calculated from the saved transactions." })
   }
 
   const submitQuickPayment = async () => {
@@ -525,17 +524,23 @@ export default function StudentsList() {
       toast({ title: "Enter a valid amount", variant: "destructive" })
       return
     }
+    const numericFeeAmount = Number(quickPayFeeAmount)
+    if (!Number.isFinite(numericFeeAmount) || numericFeeAmount <= 0) {
+      toast({ title: "Enter the total fee", variant: "destructive" })
+      return
+    }
 
     setQuickPaySaving(true)
     try {
       await api.post("/api/payments", {
         studentId: quickPayStudent.id,
         amount: numericAmount,
+        feeAmount: numericFeeAmount,
         note: quickPayNote.trim() ? quickPayNote.trim() : null,
       })
       toast({
         title: "Payment recorded",
-        description: `${formatPersonName(quickPayStudent.firstName, quickPayStudent.lastName)} marked as Paid.`,
+        description: `${formatPersonName(quickPayStudent.firstName, quickPayStudent.lastName)} account balance was updated.`,
       })
       setQuickPayOpen(false)
       setQuickPayStudent(null)
@@ -743,6 +748,7 @@ export default function StudentsList() {
                 <SelectContent className={selectContentClass} position="popper">
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="PAID">Paid</SelectItem>
+                  <SelectItem value="PARTIAL">Partial</SelectItem>
                   <SelectItem value="UNPAID">Unpaid</SelectItem>
                 </SelectContent>
               </Select>
@@ -868,14 +874,15 @@ export default function StudentsList() {
                         className={`inline-flex min-w-[88px] justify-center rounded-full shadow-none px-3 py-1 text-xs font-semibold transition ${
                           student.paymentStatus === "PAID"
                             ? "bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200"
+                            : student.paymentStatus === "PARTIAL"
+                              ? "bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:hover:bg-blue-900/60 dark:border-blue-500/40"
                             : "bg-amber-50 text-amber-700 hover:bg-amber-100 border border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:hover:bg-amber-900/60 dark:border-amber-500/40"
-                        } ${paymentUpdating[student.id] ? "opacity-60 cursor-wait" : "cursor-pointer"}`}
+                        } cursor-pointer`}
                       >
                         <button
                           type="button"
                           onClick={() => togglePaymentStatus(student)}
-                          disabled={paymentUpdating[student.id]}
-                          title={student.paymentStatus === "UNPAID" ? "Click to record payment" : "Click to mark unpaid"}
+                          title={student.paymentStatus === "PAID" ? "Fully paid" : "Click to record payment"}
                         >
                           {paymentLabel(student.paymentStatus)}
                         </button>
@@ -1127,19 +1134,30 @@ export default function StudentsList() {
               <div className="rounded-xl border border-primary/15 bg-primary/5 p-4 space-y-4">
                 <div>
                   <p className="text-sm font-semibold text-foreground">
-                    {editing ? (editing.paymentStatus === "UNPAID" ? "Record Fee Payment" : "Add Payment") : "Registration Payment"}
+                    {editing ? (editing.paymentStatus === "PAID" ? "Add Payment" : "Record Fee Payment") : "Student Fee"}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {editing
-                      ? editing.paymentStatus === "UNPAID"
-                        ? "This student is unpaid. Enter the fee amount here to record payment."
-                        : "Enter an amount to record an additional payment for this student."
-                      : "If the student paid now, enter the amount. It will appear on the Payments page."}
+                      ? "Update the total fee or enter a new installment. The remaining balance is calculated automatically."
+                      : "Enter the total fee expected. If the student paid now, also enter the amount received."}
                   </p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="paymentAmount">Fee Amount (USD)</Label>
+                    <Label htmlFor="feeAmount">Total Fee (USD)</Label>
+                    <Input
+                      id="feeAmount"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={feeAmount}
+                      onChange={(e) => setFeeAmount(e.target.value)}
+                      placeholder="e.g. 55"
+                      className="bg-background"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="paymentAmount">Paid Now (USD)</Label>
                     <Input
                       id="paymentAmount"
                       type="number"
@@ -1172,24 +1190,6 @@ export default function StudentsList() {
             )}
 
             {enrollmentStatus === "ENROLLED" && isAdmin && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Payment Status</Label>
-                  <Select
-                    value={paymentAmount.trim() ? "PAID" : paymentStatus}
-                    onValueChange={(v) => setPaymentStatus(v as "PAID" | "UNPAID")}
-                    disabled={Boolean(paymentAmount.trim())}
-                  >
-                    <SelectTrigger className="w-full bg-background">
-                      <SelectValue placeholder="Select payment status" />
-                    </SelectTrigger>
-                    <SelectContent className={selectContentClass} position="popper">
-                      <SelectItem value="PAID">Paid</SelectItem>
-                      <SelectItem value="UNPAID">Unpaid</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="flex items-center justify-between rounded-lg border p-3 h-[72px]">
                   <div>
                     <p className="text-sm font-medium">Active</p>
@@ -1197,7 +1197,6 @@ export default function StudentsList() {
                   </div>
                   <Switch checked={isActive} onCheckedChange={setIsActive} />
                 </div>
-              </div>
             )}
 
             {enrollmentStatus === "ENROLLED" && !isAdmin && (
@@ -1255,17 +1254,37 @@ export default function StudentsList() {
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="quickPayAmount">Amount (USD)</Label>
+              <Label htmlFor="quickPayFeeAmount">Total Fee (USD)</Label>
+              <Input
+                id="quickPayFeeAmount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                value={quickPayFeeAmount}
+                onChange={(e) => setQuickPayFeeAmount(e.target.value)}
+                placeholder="e.g. 55"
+                className="h-11 bg-background"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="quickPayAmount">Paid Now (USD)</Label>
               <Input
                 id="quickPayAmount"
                 type="number"
-                min="1"
+                min="0.01"
+                step="0.01"
                 value={quickPayAmount}
                 onChange={(e) => setQuickPayAmount(e.target.value)}
                 placeholder="e.g. 50"
                 className="h-11 bg-background"
               />
             </div>
+            {quickPayStudent && (
+              <p className="text-sm text-muted-foreground">
+                Paid so far: <span className="font-semibold text-[#003D9E]">{formatCurrency(quickPayStudent.totalPaid ?? 0)}</span>
+                {quickPayStudent.remainingBalance ? ` | Balance: ${formatCurrency(quickPayStudent.remainingBalance)}` : ""}
+              </p>
+            )}
             <div className="space-y-2">
               <Label htmlFor="quickPayNote">Note (optional)</Label>
               <Input

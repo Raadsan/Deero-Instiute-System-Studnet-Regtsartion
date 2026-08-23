@@ -79,7 +79,7 @@ export async function GET() {
 
   const [paidStudents, unpaidStudents] = await Promise.all([
     prisma.student.count({ where: { isActive: true, paymentStatus: "PAID" } }),
-    prisma.student.count({ where: { isActive: true, paymentStatus: "UNPAID" } }),
+    prisma.student.count({ where: { isActive: true, paymentStatus: { in: ["UNPAID", "PARTIAL"] } } }),
   ])
 
   const now = new Date()

@@ -171,7 +171,7 @@ export default function FinanceDashboard() {
           <div className="space-y-2 text-sm">
             <div className="flex justify-between"><span>Student fees collected</span><span className="font-medium">{formatMoney(summary.studentFees.totalCollected)}</span></div>
             <div className="flex justify-between"><span>Student fees this month</span><span className="font-medium">{formatMoney(summary.studentFees.monthlyCollected)}</span></div>
-            <div className="flex justify-between"><span>Unpaid students</span><span className="font-medium">{summary.studentFees.unpaidStudents}</span></div>
+            <div className="flex justify-between"><span>Outstanding students</span><span className="font-medium">{summary.studentFees.unpaidStudents}</span></div>
             <div className="flex justify-between"><span>Other income entries</span><span className="font-medium">{formatMoney(summary.overview.manualIncome)}</span></div>
             <div className="flex justify-between"><span>Manual expenses</span><span className="font-medium">{formatMoney(summary.overview.manualExpenses)}</span></div>
             <div className="flex justify-between border-t pt-2"><span>Net balance</span><span className="font-semibold">{formatMoney(summary.overview.netBalance)}</span></div>
