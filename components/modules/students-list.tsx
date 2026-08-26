@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useRef } from "react"
-import { Plus, Pencil, Trash2, Search, Users, CalendarClock, GraduationCap, Upload, ReceiptText } from "lucide-react"
+import { Plus, Pencil, Trash2, Search, Users, CalendarClock, GraduationCap, Upload, ReceiptText, Eye, EyeOff } from "lucide-react"
 import * as XLSX from "xlsx"
 import { isStudentNameHeader, normalizeImportHeader, parseStudentFullName } from "@/lib/student-import"
 
@@ -45,6 +45,7 @@ type StudentRow = {
   visitDate: string | null
   visitNote: string | null
   isActive: boolean
+  isHidden: boolean
   classId: string | null
   class: { id: string; name: string; level: string | null; isActive: boolean } | null
   registeredById: string | null
@@ -163,6 +164,7 @@ export default function StudentsList() {
   const [filterClassId, setFilterClassId] = useState<string>("all")
   const [filterPayment, setFilterPayment] = useState<string>("all")
   const [filterEnrollment, setFilterEnrollment] = useState<string>("all")
+  const [filterVisibility, setFilterVisibility] = useState<string>("all")
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState<StudentRow | null>(null)
@@ -194,6 +196,7 @@ export default function StudentsList() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({})
+  const [visibilityUpdating, setVisibilityUpdating] = useState<Record<string, boolean>>({})
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [bulkImportOpen, setBulkImportOpen] = useState(false)
@@ -266,6 +269,7 @@ export default function StudentsList() {
       if (filterClassId !== "all") params.set("classId", filterClassId)
       if (filterPayment !== "all") params.set("paymentStatus", filterPayment)
       if (filterEnrollment !== "all") params.set("enrollmentStatus", filterEnrollment)
+      params.set("visibility", filterVisibility)
       if (debouncedSearch.trim()) params.set("search", debouncedSearch.trim())
 
       const res = await api.get<PaginatedStudentsResponse>(`/api/students?${params.toString()}`)
@@ -304,7 +308,7 @@ export default function StudentsList() {
     setPage(1)
     void fetchStudents(1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filterClassId, filterPayment, filterEnrollment, debouncedSearch])
+  }, [filterClassId, filterPayment, filterEnrollment, filterVisibility, debouncedSearch])
 
   const filtered = students
 
@@ -504,6 +508,43 @@ export default function StudentsList() {
       }
     } finally {
       setStatusUpdating((cur) => {
+        const next = { ...cur }
+        delete next[student.id]
+        return next
+      })
+    }
+  }
+
+  const toggleStudentVisibility = async (student: StudentRow) => {
+    if (visibilityUpdating[student.id]) return
+    const nextIsHidden = !student.isHidden
+    const previousIsHidden = student.isHidden
+
+    setVisibilityUpdating((cur) => ({ ...cur, [student.id]: true }))
+    setStudents((cur) => cur.map((row) => (row.id === student.id ? { ...row, isHidden: nextIsHidden } : row)))
+
+    try {
+      await api.patch(`/api/students/${student.id}/visibility`, { isHidden: nextIsHidden })
+      toast({
+        title: nextIsHidden ? "Student hidden" : "Student visible again",
+        description: nextIsHidden
+          ? "The student is hidden from the class and teacher. Their class assignment is saved."
+          : "The student is back in their previous class and is visible to the teacher.",
+      })
+
+      if (filterVisibility !== "all") await fetchStudents()
+    } catch (e: any) {
+      const status = e?.response?.status
+      if (status === 404) {
+        setStudents((cur) => cur.filter((row) => row.id !== student.id))
+        toast({ title: "Student not found", description: "Refreshing student list...", variant: "destructive" })
+        await fetchStudents()
+      } else {
+        setStudents((cur) => cur.map((row) => (row.id === student.id ? { ...row, isHidden: previousIsHidden } : row)))
+        toast({ title: "Visibility update failed", description: getErrorMessage(e), variant: "destructive" })
+      }
+    } finally {
+      setVisibilityUpdating((cur) => {
         const next = { ...cur }
         delete next[student.id]
         return next
@@ -762,6 +803,22 @@ export default function StudentsList() {
               </Select>
             </div>
           )}
+
+          {isAdmin && (
+            <div className="flex flex-1 flex-col gap-2 min-w-0 w-full lg:basis-0">
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Visibility</Label>
+              <Select value={filterVisibility} onValueChange={setFilterVisibility}>
+                <SelectTrigger className="h-11 w-full rounded-lg bg-background border-muted shadow-sm">
+                  <SelectValue placeholder="All students" />
+                </SelectTrigger>
+                <SelectContent className={selectContentClass} position="popper">
+                  <SelectItem value="all">All Students</SelectItem>
+                  <SelectItem value="visible">Visible</SelectItem>
+                  <SelectItem value="hidden">Hidden</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
       </Card>
 
@@ -805,16 +862,24 @@ export default function StudentsList() {
                   {isAdmin && (
                     <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center w-[120px]">Status</TableHead>
                   )}
-                  <TableHead className="text-right pr-6 font-semibold text-xs uppercase tracking-wider text-muted-foreground w-[100px]">Actions</TableHead>
+                  <TableHead className="text-right pr-6 font-semibold text-xs uppercase tracking-wider text-muted-foreground w-[140px]">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((student) => (
-                  <TableRow key={student.id} className="group hover:bg-muted/40 transition-colors border-b-muted/40 last:border-0">
+                  <TableRow
+                    key={student.id}
+                    className={`group hover:bg-muted/40 transition-colors border-b-muted/40 last:border-0 ${student.isHidden ? "bg-slate-50/80 text-muted-foreground dark:bg-slate-900/30" : ""}`}
+                  >
                     <TableCell className="py-4 pl-6">
                       <div className="space-y-1">
-                        <div className="text-base text-foreground font-semibold tracking-tight">
-                          {formatPersonName(student.firstName, student.lastName)}
+                        <div className="flex items-center gap-2 text-base text-foreground font-semibold tracking-tight">
+                          <span>{formatPersonName(student.firstName, student.lastName)}</span>
+                          {student.isHidden && (
+                            <Badge variant="secondary" className="rounded-full bg-slate-200 text-slate-700 border border-slate-300 text-[10px] uppercase tracking-wide dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700">
+                              Hidden
+                            </Badge>
+                          )}
                         </div>
                         <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-xs text-muted-foreground">
                           <span className="truncate max-w-[220px]">{student.email || "No email"}</span>
@@ -934,6 +999,23 @@ export default function StudentsList() {
                             className="h-8 w-8 text-muted-foreground hover:text-[#003D9E] hover:bg-blue-50 rounded-full transition-colors"
                           >
                             <ReceiptText className="w-4 h-4" />
+                          </Button>
+                        )}
+                        {isAdmin && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => void toggleStudentVisibility(student)}
+                            disabled={visibilityUpdating[student.id]}
+                            aria-label={student.isHidden ? "Unhide student" : "Hide student"}
+                            title={student.isHidden ? "Unhide student and restore class visibility" : "Hide student from class and teacher"}
+                            className={`h-8 w-8 rounded-full transition-colors ${
+                              student.isHidden
+                                ? "text-emerald-700 hover:text-emerald-800 hover:bg-emerald-50"
+                                : "text-muted-foreground hover:text-amber-700 hover:bg-amber-50"
+                            } ${visibilityUpdating[student.id] ? "opacity-50 cursor-wait" : ""}`}
+                          >
+                            {student.isHidden ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                           </Button>
                         )}
                         <Button

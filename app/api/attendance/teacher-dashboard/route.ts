@@ -28,7 +28,11 @@ export async function GET() {
 
   const records = classIds.length
     ? await prisma.attendance.findMany({
-        where: { classId: { in: classIds }, date: { gte: start, lt: end } },
+        where: {
+          classId: { in: classIds },
+          date: { gte: start, lt: end },
+          student: { isHidden: false },
+        },
         select: { classId: true, date: true, status: true },
       })
     : []

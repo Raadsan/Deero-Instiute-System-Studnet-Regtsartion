@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   const dateStr = searchParams.get("date")
 
   let isScheduledDay = false
-  let attendanceRecords: Array<{ studentId: string; status: "PRESENT" | "ABSENT" }> = []
+  let attendanceRecords: Array<{ studentId: string; status: "PRESENT" | "ABSENT"; note: string | null }> = []
 
   if (dateStr) {
     const range = parseInstituteDay(dateStr)
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       if (isScheduledDay) {
         const records = await prisma.attendance.findMany({
           where: { classId, teacherId: session.userId, date: { gte: range.start, lt: range.end } },
-          select: { studentId: true, status: true },
+          select: { studentId: true, status: true, note: true },
         })
 
         attendanceRecords = records
@@ -53,17 +53,17 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       isScheduledDay: false,
       students: [],
       attendance: {},
+      notes: {},
     })
   }
 
   const students = await prisma.student.findMany({
-    where: { classId, isActive: true },
+    where: { classId, isActive: true, isHidden: false },
     select: { 
       id: true, 
       studentCode: true,
       firstName: true, 
       lastName: true,
-      gender: true,
       attendances: {
         select: { status: true }
       }
@@ -78,6 +78,14 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
       publicCodeByInternalId.get(record.studentId) ?? "UNASSIGNED",
       record.status,
     ]),
+  )
+  const noteMap = Object.fromEntries(
+    attendanceRecords
+      .filter((record) => record.note)
+      .map((record) => [
+        publicCodeByInternalId.get(record.studentId) ?? "UNASSIGNED",
+        record.note ?? "",
+      ]),
   )
 
   return NextResponse.json({
@@ -94,10 +102,10 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
         studentCode: s.studentCode ?? "UNASSIGNED",
         firstName: s.firstName, 
         lastName: s.lastName,
-        gender: s.gender,
         attendancePercentage: percentage
       }
     }),
     attendance: attendanceMap,
+    notes: noteMap,
   })
 }

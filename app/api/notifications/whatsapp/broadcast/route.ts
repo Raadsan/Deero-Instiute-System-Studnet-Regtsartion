@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (!resolvedClassId) return NextResponse.json({ message: "classId or courseId is required" }, { status: 400 })
 
     const students = await prisma.student.findMany({
-      where: { classId: resolvedClassId, isActive: true },
+      where: { classId: resolvedClassId, isActive: true, isHidden: false },
       select: { phone: true, firstName: true },
     })
 

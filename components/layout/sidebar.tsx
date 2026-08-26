@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname, useSearchParams } from "next/navigation"
 import {
@@ -96,6 +96,18 @@ export default function Sidebar({
   const [classesLoading, setClassesLoading] = useState(false)
   const [classesOpen, setClassesOpen] = useState(pathname.startsWith("/teacher-classes"))
   const selectedClassId = searchParams.get("classId")
+  const [profile, setProfile] = useState<{ name: string; email: string; role: AppRole } | null>(null)
+
+  const initials = useMemo(
+    () =>
+      profile?.name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase())
+        .join("") || "U",
+    [profile?.name],
+  )
 
   useEffect(() => {
     setRole(roleProp ?? null)
@@ -104,10 +116,17 @@ export default function Sidebar({
   useEffect(() => {
     void (async () => {
       try {
-        const res = await api.get<{ role: AppRole; allowedRoutes: string[] }>("/api/auth/me")
+        const res = await api.get<{ role: AppRole; allowedRoutes: string[]; name: string; email: string }>("/api/auth/me")
         const resolved = normalizeClientRole(res.data.role)
         if (resolved) setRole(resolved)
         if (res.data.allowedRoutes) setAllowedRoutes(res.data.allowedRoutes)
+        if (res.data.name) {
+          setProfile({
+            name: res.data.name,
+            email: res.data.email || "",
+            role: res.data.role,
+          })
+        }
       } catch {
         // keep server-provided role
       }
@@ -303,22 +322,7 @@ export default function Sidebar({
         })}
       </nav>
 
-      <div className="border-t border-sidebar-border p-3">
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              await api.post("/api/auth/logout")
-            } finally {
-              window.location.href = "/login"
-            }
-          }}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sidebar-foreground hover:bg-sidebar-accent/80 transition-colors"
-        >
-          <LogOut className="w-5 h-5 flex-shrink-0" />
-          {isOpen && <span className="text-sm font-medium">Logout</span>}
-        </button>
-      </div>
+
     </aside>
   )
 }

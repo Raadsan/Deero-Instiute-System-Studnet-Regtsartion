@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Download, Users, CalendarCheck, FileBarChart, Search } from "lucide-react"
+import { Download, Users, CalendarCheck, FileBarChart, Search, FileText } from "lucide-react"
 import { Spinner } from "@/components/ui/spinner"
 import { Badge } from "@/components/ui/badge"
 import { Label } from "@/components/ui/label"
@@ -12,6 +12,15 @@ import { api } from "@/lib/api"
 import { toast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 type ClassOption = { id: string; name: string; level: string | null; isActive: boolean }
 
@@ -118,6 +127,7 @@ export default function AttendanceView() {
   const [reportSearch, setReportSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("ALL")
   const [genderFilter, setGenderFilter] = useState<string>("ALL")
+  const [selectedExcuse, setSelectedExcuse] = useState<AttendanceRecordRow | null>(null)
 
   useEffect(() => {
     setStatusFilter("ALL")
@@ -241,6 +251,7 @@ export default function AttendanceView() {
       // Status Filter
       if (statusFilter === "PRESENT" && r.status !== "PRESENT") return false
       if (statusFilter === "ABSENT" && r.status !== "ABSENT") return false
+      if (statusFilter === "EXCUSED" && (r.status !== "ABSENT" || !r.note?.trim())) return false
       if (statusFilter === "NOT_MARKED" && r.status !== "NOT_MARKED") return false
       
       // Gender Filter
@@ -475,6 +486,7 @@ export default function AttendanceView() {
                        <SelectItem value="ALL">All Statuses</SelectItem>
                        <SelectItem value="PRESENT">Present</SelectItem>
                        <SelectItem value="ABSENT">Absent</SelectItem>
+                       <SelectItem value="EXCUSED">Excused Absence</SelectItem>
                        <SelectItem value="NOT_MARKED">Not Marked</SelectItem>
                      </SelectContent>
                    </Select>
@@ -508,6 +520,7 @@ export default function AttendanceView() {
                       <TableHead className="py-4 pl-6 font-semibold text-xs uppercase tracking-wider text-muted-foreground">Student</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground">Class</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground text-center w-[110px]">Status</TableHead>
+                      <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground min-w-[240px]">Excuse / Reason</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden md:table-cell">Teacher</TableHead>
                       <TableHead className="font-semibold text-xs uppercase tracking-wider text-muted-foreground hidden md:table-cell text-right pr-6">Time</TableHead>
                     </TableRow>
@@ -552,6 +565,31 @@ export default function AttendanceView() {
                             {statusLabel(r.status)}
                           </Badge>
                         </TableCell>
+                        <TableCell className="py-4 align-middle">
+                          {r.status === "ABSENT" ? (
+                            r.note?.trim() ? (
+                              <div className="flex flex-col items-start gap-2">
+                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">
+                                  Excused
+                                </Badge>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8 gap-1.5"
+                                  onClick={() => setSelectedExcuse(r)}
+                                >
+                                  <FileText className="h-3.5 w-3.5" />
+                                  View excuse
+                                </Button>
+                              </div>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">No excuse provided</span>
+                            )
+                          ) : (
+                            <span className="text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
                         <TableCell className="hidden md:table-cell py-4 text-sm text-foreground/80 align-middle">{r.teacher?.name ?? "—"}</TableCell>
                         <TableCell className="hidden md:table-cell py-4 text-sm text-muted-foreground text-right pr-6 font-mono">
                           {r.createdAt ? new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "—"}
@@ -560,7 +598,7 @@ export default function AttendanceView() {
                     ))}
                     {!filteredRecords.length && (
                       <TableRow>
-                        <TableCell colSpan={5} className="h-24 text-center text-muted-foreground">
+                        <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
                           No students match the selected filters.
                         </TableCell>
                       </TableRow>
@@ -656,6 +694,60 @@ export default function AttendanceView() {
           )}
         </div>
       )}
+
+      <Dialog open={Boolean(selectedExcuse)} onOpenChange={(open) => !open && setSelectedExcuse(null)}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <div className="mb-1 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+              <FileText className="h-5 w-5" />
+            </div>
+            <DialogTitle>Attendance Excuse</DialogTitle>
+            <DialogDescription>
+              The excuse or absence reason submitted by the teacher.
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedExcuse && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 gap-3 rounded-xl border bg-muted/20 p-4 sm:grid-cols-2">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Student</p>
+                  <p className="mt-1 font-semibold">
+                    {selectedExcuse.student
+                      ? formatPersonName(selectedExcuse.student.firstName, selectedExcuse.student.lastName)
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Class</p>
+                  <p className="mt-1 font-semibold">{selectedExcuse.class.name}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Teacher</p>
+                  <p className="mt-1 font-semibold">{selectedExcuse.teacher?.name ?? "—"}</p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Date</p>
+                  <p className="mt-1 font-semibold">{date}</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Teacher&apos;s excuse / reason</p>
+                <p className="mt-2 whitespace-pre-wrap break-words text-base leading-7 text-foreground">
+                  {selectedExcuse.note}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button type="button">Close</Button>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -25,7 +25,7 @@ async function getClassStats(classIds: string[]) {
   const [studentCounts, monthlyPayments, totalPayments] = await Promise.all([
     prisma.student.groupBy({
       by: ["classId"],
-      where: { classId: { in: classIds }, isActive: true },
+      where: { classId: { in: classIds }, isActive: true, isHidden: false },
       _count: { _all: true },
     }),
     prisma.payment.groupBy({
@@ -48,7 +48,7 @@ async function getClassStats(classIds: string[]) {
   }
 
   const studentClassMap = await prisma.student.findMany({
-    where: { classId: { in: classIds }, isActive: true },
+    where: { classId: { in: classIds }, isActive: true, isHidden: false },
     select: { id: true, classId: true },
   })
 

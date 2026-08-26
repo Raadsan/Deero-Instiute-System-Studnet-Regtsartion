@@ -6,7 +6,7 @@ async function getStudentCounts(classIds: string[]) {
 
   const counts = await prisma.student.groupBy({
     by: ["classId"],
-    where: { classId: { in: classIds }, isActive: true },
+    where: { classId: { in: classIds }, isActive: true, isHidden: false },
     _count: { _all: true },
   })
 

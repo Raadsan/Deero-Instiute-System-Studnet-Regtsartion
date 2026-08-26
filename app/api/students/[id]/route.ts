@@ -49,6 +49,7 @@ export async function GET(_: NextRequest, { params }: RouteContext) {
     visitNote: student.visitNote ?? null,
     visitReminderSentAt: student.visitReminderSentAt ?? null,
     isActive: Boolean(student.isActive),
+    isHidden: Boolean(student.isHidden),
     classId,
     class: cls ?? null,
     payments,

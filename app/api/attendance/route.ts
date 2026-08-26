@@ -24,10 +24,30 @@ export async function POST(req: Request) {
 
   const teacherId = session.userId
 
-  const items = body.items as Array<{ studentId: string; status: "PRESENT" | "ABSENT"; note?: string }>
-  if (!Array.isArray(items) || items.length === 0) {
+  const rawItems = body.items as unknown
+  if (!Array.isArray(rawItems) || rawItems.length === 0) {
     return NextResponse.json({ message: "items is required" }, { status: 400 })
   }
+
+  const hasInvalidItem = rawItems.some((item) => {
+    if (!item || typeof item !== "object") return true
+    const candidate = item as Record<string, unknown>
+    return (
+      typeof candidate.studentId !== "string" ||
+      (candidate.status !== "PRESENT" && candidate.status !== "ABSENT") ||
+      (candidate.note !== undefined && typeof candidate.note !== "string") ||
+      (typeof candidate.note === "string" && candidate.note.trim().length > 500)
+    )
+  })
+  if (hasInvalidItem) {
+    return NextResponse.json({ message: "Invalid attendance item or excuse (maximum 500 characters)" }, { status: 400 })
+  }
+
+  const items = rawItems.map((item) => {
+    const candidate = item as { studentId: string; status: "PRESENT" | "ABSENT"; note?: string }
+    const note = candidate.status === "ABSENT" ? candidate.note?.trim() || undefined : undefined
+    return { studentId: candidate.studentId, status: candidate.status, note }
+  })
 
   const cls = await prisma.class.findUnique({
     where: { id: classId },
@@ -51,7 +71,7 @@ export async function POST(req: Request) {
   const uniqueStudentCodes = Array.from(new Set(studentCodes))
 
   const students = await prisma.student.findMany({
-    where: { studentCode: { in: uniqueStudentCodes }, classId },
+    where: { studentCode: { in: uniqueStudentCodes }, classId, isActive: true, isHidden: false },
     select: { id: true, studentCode: true },
   })
 

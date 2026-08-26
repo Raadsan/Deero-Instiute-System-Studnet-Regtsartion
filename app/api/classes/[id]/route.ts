@@ -49,7 +49,7 @@ export async function GET(
   }
 
   const students = await prisma.student.findMany({
-    where: { classId: cls.id },
+    where: { classId: cls.id, isHidden: false },
     orderBy: { createdAt: "desc" },
   });
 

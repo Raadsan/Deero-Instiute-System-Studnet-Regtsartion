@@ -28,7 +28,7 @@ export async function GET() {
   const counts = classIds.length
     ? await prisma.student.groupBy({
         by: ["classId"],
-        where: { classId: { in: classIds }, isActive: true },
+        where: { classId: { in: classIds }, isActive: true, isHidden: false },
         _count: { _all: true },
       })
     : []

@@ -266,6 +266,7 @@ model Student {
   visitNote           String?
   visitReminderSentAt DateTime?
   isActive            Boolean          @default(true)
+  isHidden            Boolean          @default(false)
 
   classId String?
   class   Class?  @relation(fields: [classId], references: [id], onDelete: SetNull)
@@ -286,6 +287,7 @@ model Student {
   @@index([registeredById])
   @@index([isActive, paymentStatus])
   @@index([isActive, enrollmentStatus, visitDate])
+  @@index([classId, isHidden, isActive])
   @@index([createdAt])
 }
 

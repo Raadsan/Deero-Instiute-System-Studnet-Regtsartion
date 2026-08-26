@@ -17,6 +17,7 @@ export async function GET(req: NextRequest) {
     prisma.attendance.findMany({
       where: {
         date: { gte: range.start, lt: range.end },
+        student: { isHidden: false },
         ...(classId ? { classId } : {}),
       },
       select: { classId: true, status: true, teacherId: true },
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
         name: true,
         level: true,
         teacher: { select: { id: true, name: true, email: true } },
-        students: { where: { isActive: true }, select: { id: true } },
+        students: { where: { isActive: true, isHidden: false }, select: { id: true } },
       },
       orderBy: { name: "asc" },
     }),

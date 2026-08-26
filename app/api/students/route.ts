@@ -25,6 +25,7 @@ function mapStudent(
     visitNote: string | null;
     visitReminderSentAt: Date | null;
     isActive: boolean;
+    isHidden: boolean;
     classId: string | null;
     registeredById: string | null;
     createdAt: Date;
@@ -52,6 +53,7 @@ function mapStudent(
     visitNote: s.visitNote ?? null,
     visitReminderSentAt: s.visitReminderSentAt ?? null,
     isActive: Boolean(s.isActive),
+    isHidden: Boolean(s.isHidden),
     classId,
     class: cls ?? null,
     registeredById,
@@ -71,6 +73,7 @@ export async function GET(req: Request) {
   const paymentStatus = searchParams.get("paymentStatus");
   const enrollmentStatus = searchParams.get("enrollmentStatus");
   const isActive = searchParams.get("isActive");
+  const visibility = searchParams.get("visibility") ?? "visible";
   const search = searchParams.get("search")?.trim() ?? "";
   const { page, pageSize, skip } = parsePagination(searchParams);
 
@@ -90,6 +93,18 @@ export async function GET(req: Request) {
   }
   if (isActive === "true") where.isActive = true;
   if (isActive === "false") where.isActive = false;
+
+  if (visibility !== "all" && visibility !== "visible" && visibility !== "hidden") {
+    return NextResponse.json({ message: "Invalid visibility" }, { status: 400 });
+  }
+
+  if (session.role === "ADMIN") {
+    if (visibility === "visible") where.isHidden = false;
+    if (visibility === "hidden") where.isHidden = true;
+  } else {
+    // Hidden records are managed by admins and are not exposed to registrar lists.
+    where.isHidden = false;
+  }
 
   if (session.role === "REGISTRAR") {
     where.registeredById = session.userId;
@@ -265,6 +280,7 @@ export async function POST(req: Request) {
         visitNote: enrollment.data.visitNote,
         visitReminderSentAt: null,
         isActive: true,
+        isHidden: false,
         classId,
         registeredById: session.userId,
       },

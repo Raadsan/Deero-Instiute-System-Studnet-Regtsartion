@@ -387,10 +387,11 @@ export default function ReportsView() {
                 placeholder="2026-07"
                 value={month}
                 onChange={(e) => setMonth(e.target.value)}
+                className="h-10"
               />
             </div>
             <div className="flex items-end gap-2 sm:col-span-2">
-              <Button variant="outline" className="gap-2" onClick={() => void fetchReport()} disabled={loading}>
+              <Button variant="outline" className="gap-2 h-10" onClick={() => void fetchReport()} disabled={loading}>
                 <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                 Refresh
               </Button>

@@ -32,7 +32,7 @@ function isStalePrismaClient(client: PrismaClient) {
   const paymentFields = runtime?.models?.Payment?.fields?.map((field) => field.name) ?? []
   if (!paymentFields.includes("recordedById")) return true
   const studentFields = runtime?.models?.Student?.fields?.map((field) => field.name) ?? []
-  if (!studentFields.includes("studentCode")) return true
+  if (!studentFields.includes("studentCode") || !studentFields.includes("isHidden")) return true
 
   const hasPasswordReset = "passwordResetToken" in client
   const hasAttendanceArchive = "attendanceArchive" in client

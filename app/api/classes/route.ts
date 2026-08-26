@@ -80,7 +80,7 @@ export async function GET(req: Request) {
   const counts = classIds.length
     ? await prisma.student.groupBy({
         by: ["classId"],
-        where: { classId: { in: classIds } },
+        where: { classId: { in: classIds }, isHidden: false },
         _count: { _all: true },
       })
     : [];

@@ -51,7 +51,7 @@ export async function GET(req: NextRequest) {
     classIds.length
       ? prisma.student.groupBy({
           by: ["classId"],
-          where: { classId: { in: classIds }, isActive: true },
+          where: { classId: { in: classIds }, isActive: true, isHidden: false },
           _count: { _all: true },
         })
       : [],
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
     },
   })
 
-  const studentsCount = await prisma.student.count({ where: { classId, isActive: true } })
+  const studentsCount = await prisma.student.count({ where: { classId, isActive: true, isHidden: false } })
 
   return NextResponse.json(
     {

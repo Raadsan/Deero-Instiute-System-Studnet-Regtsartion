@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
 
   const [students, teachers, classes] = await Promise.all([
     prisma.student.findMany({
-          where: { isActive: true, ...(classId ? { classId } : { classId: { not: null } }) },
+          where: { isActive: true, isHidden: false, ...(classId ? { classId } : { classId: { not: null } }) },
           select: { 
             id: true, 
             classId: true,

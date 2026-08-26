@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react"
 import { CalendarDays, Info, Search } from "lucide-react"
 
 import { api } from "@/lib/api"
-import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -55,6 +55,13 @@ function formatReportDate(value: string) {
     month: "short",
     year: "numeric",
   })
+}
+
+function percentageColor(percentage: number | null) {
+  const value = percentage ?? 0
+  if (value >= 80) return "border-emerald-200 bg-emerald-100 text-emerald-800"
+  if (value >= 50) return "border-amber-200 bg-amber-100 text-amber-800"
+  return "border-rose-200 bg-rose-100 text-rose-800"
 }
 
 export default function TeacherAttendanceReport() {
@@ -146,7 +153,7 @@ export default function TeacherAttendanceReport() {
             <div className="space-y-2">
               <p className="text-base font-semibold">Course</p>
               <Select value={courseId} onValueChange={setCourseId} disabled={!courses.length}>
-                <SelectTrigger className="!h-14 w-full rounded-lg px-4 text-base shadow-sm">
+                <SelectTrigger className="h-12 w-full rounded-lg px-4 text-base shadow-sm">
                   <SelectValue placeholder={courses.length ? "Select course" : "No course assigned"} />
                 </SelectTrigger>
                 <SelectContent>
@@ -158,7 +165,7 @@ export default function TeacherAttendanceReport() {
             <div className="space-y-2">
               <p className="text-base font-semibold">Class</p>
               <Select value={classId} onValueChange={chooseClass}>
-                <SelectTrigger className="!h-14 w-full rounded-lg px-4 text-base shadow-sm"><SelectValue placeholder="Select class" /></SelectTrigger>
+                <SelectTrigger className="h-12 w-full rounded-lg px-4 text-base shadow-sm"><SelectValue placeholder="Select class" /></SelectTrigger>
                 <SelectContent>
                   {classes.map((item) => <SelectItem key={item.id} value={item.id}>{item.name}</SelectItem>)}
                 </SelectContent>
@@ -174,7 +181,7 @@ export default function TeacherAttendanceReport() {
                   setReport(null)
                 }}
               >
-                <SelectTrigger className="!h-14 w-full rounded-lg px-4 text-base shadow-sm">
+                <SelectTrigger className="h-12 w-full rounded-lg px-4 text-base shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -195,7 +202,7 @@ export default function TeacherAttendanceReport() {
                 <p className="text-xs text-muted-foreground">
                   {periodMode === "range"
                     ? "Attendance from the first selected date through the last selected date."
-                    : "Generate the complete attendance report for one month."}
+                    : "View the complete attendance report for one month."}
                 </p>
               </div>
             </div>
@@ -236,22 +243,17 @@ export default function TeacherAttendanceReport() {
             )}
           </div>
 
-          <div className="flex justify-center py-2">
-            <Button
-              className="h-12 min-w-44 rounded-full text-base"
-              onClick={() => void generate()}
-              disabled={
-                !classId ||
-                loading ||
-                (periodMode === "month" ? !month : !fromDate || !toDate || fromDate > toDate)
-              }
-            >
-              {loading ? <><Spinner className="mr-2" />Generating...</> : "Generate"}
-            </Button>
-          </div>
+          {loading && (
+            <div className="flex justify-center py-2" role="status" aria-live="polite">
+              <div className="inline-flex h-10 items-center gap-2 rounded-full border bg-muted/30 px-4 text-sm font-medium text-muted-foreground">
+                <Spinner className="h-4 w-4" />
+                Updating report...
+              </div>
+            </div>
+          )}
 
-          <div className="flex h-14 overflow-hidden rounded-lg border bg-background">
-            <div className="flex w-14 shrink-0 items-center justify-center bg-primary text-primary-foreground">
+          <div className="flex h-12 overflow-hidden rounded-lg border bg-background">
+            <div className="flex w-12 shrink-0 items-center justify-center bg-primary text-primary-foreground">
               <Info className="h-5 w-5" />
             </div>
             <div className="relative flex-1">
@@ -324,7 +326,9 @@ export default function TeacherAttendanceReport() {
                         <TableCell className="text-center tabular-nums">{item.present}</TableCell>
                         <TableCell className="text-center tabular-nums">{item.absent}</TableCell>
                         <TableCell className="pr-6 text-right font-semibold tabular-nums">
-                          {`${item.percentage ?? 0}%`}
+                          <Badge variant="outline" className={`min-w-16 justify-center ${percentageColor(item.percentage)}`}>
+                            {`${item.percentage ?? 0}%`}
+                          </Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -337,7 +341,7 @@ export default function TeacherAttendanceReport() {
             </div>
           ) : (
             <div className="py-10 text-center text-sm text-muted-foreground">
-              Select a class and report period, then click Generate to view the report.
+              Select a class and report period. The report will appear automatically.
             </div>
           )}
         </div>

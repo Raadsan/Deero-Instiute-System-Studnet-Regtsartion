@@ -72,7 +72,7 @@ export async function GET(req: NextRequest) {
       teacher: { select: { name: true } },
       courses: { where: { status: "ACTIVE" }, select: { id: true, name: true }, orderBy: { name: "asc" } },
       students: {
-        where: { isActive: true },
+        where: { isActive: true, isHidden: false },
         select: { id: true, studentCode: true, firstName: true, lastName: true },
         orderBy: [{ firstName: "asc" }, { lastName: "asc" }],
       },

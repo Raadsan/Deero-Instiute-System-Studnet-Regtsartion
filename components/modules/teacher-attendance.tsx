@@ -9,6 +9,7 @@ import { Users, GraduationCap, CalendarCheck, CalendarX2, FileBarChart, Search, 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { formatScheduleDays, getDefaultAttendanceDate, isDateInputOnSchedule, formatDateInputValue } from "@/lib/class-schedule"
 
@@ -25,7 +26,6 @@ type StudentRow = {
   studentCode: string
   firstName: string
   lastName: string
-  gender?: string | null
   attendancePercentage?: number | null
 }
 
@@ -61,6 +61,7 @@ export default function TeacherAttendance() {
 
   const [students, setStudents] = useState<StudentRow[]>([])
   const [statusByStudentId, setStatusByStudentId] = useState<Record<string, AttendanceStatus>>({})
+  const [noteByStudentId, setNoteByStudentId] = useState<Record<string, string>>({})
 
   const [loadingClasses, setLoadingClasses] = useState(true)
   const [loadingStudents, setLoadingStudents] = useState(false)
@@ -71,7 +72,6 @@ export default function TeacherAttendance() {
   const [reportSearch, setReportSearch] = useState("")
 
   const [statusFilter, setStatusFilter] = useState<string>("ALL")
-  const [genderFilter, setGenderFilter] = useState<string>("ALL")
 
   useEffect(() => {
     const run = async () => {
@@ -135,6 +135,7 @@ export default function TeacherAttendance() {
       if (!selectedClassId) {
         setStudents([])
         setStatusByStudentId({})
+        setNoteByStudentId({})
         return
       }
 
@@ -142,16 +143,22 @@ export default function TeacherAttendance() {
       if (!days.length || !isDateInputOnSchedule(days, date)) {
         setStudents([])
         setStatusByStudentId({})
+        setNoteByStudentId({})
         return
       }
 
       setLoadingStudents(true)
       try {
-        const res = await api.get<{ students: StudentRow[]; attendance: Record<string, AttendanceStatus> }>(
+        const res = await api.get<{
+          students: StudentRow[]
+          attendance: Record<string, AttendanceStatus>
+          notes: Record<string, string>
+        }>(
           `/api/attendance/classes/${selectedClassId}/students?date=${encodeURIComponent(date)}`,
         )
         setStudents(res.data.students)
         setStatusByStudentId(res.data.attendance ?? {})
+        setNoteByStudentId(res.data.notes ?? {})
       } catch (e: any) {
         toast({ title: "Failed to load students", description: getErrorMessage(e), variant: "destructive" })
       } finally {
@@ -178,14 +185,9 @@ export default function TeacherAttendance() {
       if (statusFilter === "PRESENT" && currentStatus !== "PRESENT") return false
       if (statusFilter === "ABSENT" && currentStatus !== "ABSENT") return false
       
-      // Gender Filter
-      const gender = (s.gender || "UNKNOWN").toUpperCase()
-      if (genderFilter === "MALE" && gender !== "MALE") return false
-      if (genderFilter === "FEMALE" && gender !== "FEMALE") return false
-      
       return true
     })
-  }, [students, statusByStudentId, statusFilter, genderFilter])
+  }, [students, statusByStudentId, statusFilter])
 
   const submit = async () => {
     if (!selectedClassId) return
@@ -202,10 +204,14 @@ export default function TeacherAttendance() {
       return
     }
 
-    const items = students.map((s) => ({
-      studentId: s.id,
-      status: statusByStudentId[s.id] ?? "ABSENT",
-    }))
+    const items = students.map((s) => {
+      const status = statusByStudentId[s.id] ?? "ABSENT"
+      return {
+        studentId: s.id,
+        status,
+        note: status === "ABSENT" ? noteByStudentId[s.id]?.trim() || undefined : undefined,
+      }
+    })
 
     setSubmitting(true)
     try {
@@ -447,7 +453,7 @@ export default function TeacherAttendance() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-foreground">Mark Attendance</h2>
-          <p className="text-sm text-muted-foreground">Choose a class and date, then mark present or absent.</p>
+          <p className="text-sm text-muted-foreground">Mark attendance and add an excuse or reason for absent students.</p>
         </div>
         <div className="hidden sm:block">
           <Button className="w-full sm:w-auto px-8 rounded-full" onClick={submit} disabled={submitting || loadingStudents || !selectedClassId || !isScheduledDay}>
@@ -489,7 +495,7 @@ export default function TeacherAttendance() {
           </div>
           
           {/* Filters Row */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-muted/50">
+          <div className="grid grid-cols-1 gap-4 pt-4 border-t border-muted/50">
              <div className="space-y-2">
                <p className="text-sm font-medium">Filter by Status</p>
                <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -500,20 +506,6 @@ export default function TeacherAttendance() {
                    <SelectItem value="ALL">All Students</SelectItem>
                    <SelectItem value="PRESENT">Present</SelectItem>
                    <SelectItem value="ABSENT">Absent</SelectItem>
-                 </SelectContent>
-               </Select>
-             </div>
-             
-             <div className="space-y-2">
-               <p className="text-sm font-medium">Filter by Gender</p>
-               <Select value={genderFilter} onValueChange={setGenderFilter}>
-                 <SelectTrigger className="h-11">
-                   <SelectValue placeholder="All Genders" />
-                 </SelectTrigger>
-                 <SelectContent>
-                   <SelectItem value="ALL">All Genders</SelectItem>
-                   <SelectItem value="MALE">Male</SelectItem>
-                   <SelectItem value="FEMALE">Female</SelectItem>
                  </SelectContent>
                </Select>
              </div>
@@ -562,7 +554,6 @@ export default function TeacherAttendance() {
                         <div className="font-bold text-lg mb-1">{s.firstName} {s.lastName}</div>
                         <div className="flex gap-2 items-center">
                           <span className="text-xs text-muted-foreground font-mono">No. {index + 1}</span>
-                          {s.gender && <Badge variant="outline" className="text-[10px]">{s.gender}</Badge>}
                           <Badge variant="outline" className={`text-[10px] border-transparent ${badgeColor}`}>
                             {pct != null ? `${pct}% att` : 'N/A'}
                           </Badge>
@@ -596,6 +587,24 @@ export default function TeacherAttendance() {
                         className="h-5 w-5 rounded accent-emerald-600"
                       />
                     </label>
+                    {status === "ABSENT" && (
+                      <div className="space-y-1.5">
+                        <label htmlFor={`mobile-excuse-${s.id}`} className="text-xs font-semibold text-foreground">
+                          Excuse / reason for absence
+                        </label>
+                        <Textarea
+                          id={`mobile-excuse-${s.id}`}
+                          value={noteByStudentId[s.id] ?? ""}
+                          onChange={(event) =>
+                            setNoteByStudentId((current) => ({ ...current, [s.id]: event.target.value }))
+                          }
+                          maxLength={500}
+                          rows={2}
+                          placeholder="Write the student's excuse or reason..."
+                          className="min-h-20 resize-y bg-background"
+                        />
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -608,8 +617,9 @@ export default function TeacherAttendance() {
                   <TableRow>
                     <TableHead className="w-[100px] py-4 pl-6">No.</TableHead>
                     <TableHead className="py-4">Full Name</TableHead>
-                    <TableHead className="py-4">Gender & Att %</TableHead>
+                    <TableHead className="py-4">Attendance %</TableHead>
                     <TableHead className="py-4">Status</TableHead>
+                    <TableHead className="py-4 min-w-[280px]">Excuse / Reason</TableHead>
                     <TableHead className="py-4 text-right pr-6">Quick Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -626,7 +636,6 @@ export default function TeacherAttendance() {
                         </TableCell>
                         <TableCell className="py-4">
                           <div className="flex gap-2 items-center">
-                            {s.gender && <Badge variant="outline" className="text-[10px]">{s.gender}</Badge>}
                             <Badge variant="outline" className={`text-[10px] border-transparent ${badgeColor}`}>
                               {pct != null ? `${pct}%` : 'N/A'}
                             </Badge>
@@ -639,6 +648,23 @@ export default function TeacherAttendance() {
                           >
                             {status}
                           </Badge>
+                        </TableCell>
+                        <TableCell className="py-3">
+                          {status === "ABSENT" ? (
+                            <Textarea
+                              value={noteByStudentId[s.id] ?? ""}
+                              onChange={(event) =>
+                                setNoteByStudentId((current) => ({ ...current, [s.id]: event.target.value }))
+                              }
+                              maxLength={500}
+                              rows={2}
+                              aria-label={`Excuse or reason for ${s.firstName} ${s.lastName}`}
+                              placeholder="Write an excuse or reason..."
+                              className="min-h-16 resize-y bg-background"
+                            />
+                          ) : (
+                            <span className="text-xs text-muted-foreground">Available when absent</span>
+                          )}
                         </TableCell>
                         <TableCell className="py-4 text-right pr-6">
                           <label

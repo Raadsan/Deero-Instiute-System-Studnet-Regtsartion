@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
   end.setHours(23, 59, 59, 999)
 
   const students = await prisma.student.findMany({
-    where: { classId, isActive: true },
+    where: { classId, isActive: true, isHidden: false },
     select: { id: true, studentCode: true, firstName: true, lastName: true },
   })
   const publicCodeByInternalId = new Map(

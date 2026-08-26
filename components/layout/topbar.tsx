@@ -2,7 +2,7 @@
 
 import { useMemo, useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { Menu, Moon, Sun, Bell, Settings, X, KeyRound, UserRoundPen } from "lucide-react"
+import { Menu, Moon, Sun, Bell, Settings, X, KeyRound, UserRoundPen, LogOut } from "lucide-react"
 import { useTheme } from "next-themes"
 
 import type { AppRole } from "@/lib/auth"
@@ -163,6 +163,20 @@ export default function TopBar({ menuOpen, onMenuClick, title, role }: TopBarPro
             <DropdownMenuItem onClick={() => setChangePasswordOpen(true)}>
               <KeyRound className="h-4 w-4" />
               Change Password
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={async () => {
+                try {
+                  await api.post("/api/auth/logout")
+                } finally {
+                  window.location.href = "/login"
+                }
+              }}
+              className="text-rose-600 focus:text-rose-600 focus:bg-rose-500/10 cursor-pointer"
+            >
+              <LogOut className="h-4 w-4 text-rose-600" />
+              Logout
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
