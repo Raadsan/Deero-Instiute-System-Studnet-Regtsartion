@@ -1,13 +1,14 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { CalendarDays, Info, Search } from "lucide-react"
+import { CalendarDays, Info, Search, ArrowUpDown } from "lucide-react"
 
 import { api } from "@/lib/api"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
 import { Spinner } from "@/components/ui/spinner"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
@@ -76,6 +77,7 @@ export default function TeacherAttendanceReport() {
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc" | null>(null)
 
   const selectedClass = useMemo(() => classes.find((item) => item.id === classId) ?? null, [classes, classId])
   const courses = selectedClass?.courses ?? []
@@ -99,10 +101,18 @@ export default function TeacherAttendanceReport() {
 
   const rows = useMemo(() => {
     const query = search.trim().toLowerCase()
-    return (report?.students ?? []).filter(
+    let filtered = (report?.students ?? []).filter(
       (item) => !query || item.name.toLowerCase().includes(query) || item.studentCode.toLowerCase().includes(query),
     )
-  }, [report, search])
+    if (sortOrder) {
+      filtered = [...filtered].sort((a, b) => {
+        const aVal = a.percentage ?? 0
+        const bVal = b.percentage ?? 0
+        return sortOrder === "asc" ? aVal - bVal : bVal - aVal
+      })
+    }
+    return filtered
+  }, [report, search, sortOrder])
 
   const generate = async () => {
     if (!classId) return
@@ -132,14 +142,7 @@ export default function TeacherAttendanceReport() {
     }
   }
 
-  useEffect(() => {
-    if (!classId) return
-    if (periodMode === "month" && !month) return
-    if (periodMode === "range" && (!fromDate || !toDate || fromDate > toDate)) return
-    void generate()
-    // Report refreshes automatically when the teacher changes class or period.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [classId, periodMode, month, fromDate, toDate])
+
 
   return (
     <div className="w-full p-4 sm:p-6 lg:p-8">
@@ -247,10 +250,16 @@ export default function TeacherAttendanceReport() {
             <div className="flex justify-center py-2" role="status" aria-live="polite">
               <div className="inline-flex h-10 items-center gap-2 rounded-full border bg-muted/30 px-4 text-sm font-medium text-muted-foreground">
                 <Spinner className="h-4 w-4" />
-                Updating report...
+                Generating report...
               </div>
             </div>
           )}
+
+          <div className="flex justify-end">
+            <Button onClick={generate} disabled={loading} className="w-full sm:w-auto h-12 px-8">
+              Generate Report
+            </Button>
+          </div>
 
           <div className="flex h-12 overflow-hidden rounded-lg border bg-background">
             <div className="flex w-12 shrink-0 items-center justify-center bg-primary text-primary-foreground">
@@ -314,7 +323,15 @@ export default function TeacherAttendanceReport() {
                       <TableHead className="text-center text-base font-semibold text-foreground">Period</TableHead>
                       <TableHead className="text-center text-base font-semibold text-foreground">Present</TableHead>
                       <TableHead className="text-center text-base font-semibold text-foreground">Absent</TableHead>
-                      <TableHead className="pr-6 text-right text-base font-semibold text-foreground">Percentage</TableHead>
+                      <TableHead 
+                        className="pr-6 text-right text-base font-semibold text-foreground cursor-pointer hover:bg-muted/50 select-none transition-colors"
+                        onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc")}
+                      >
+                        <div className="flex items-center justify-end gap-1">
+                          Percentage
+                          <ArrowUpDown className="h-4 w-4" />
+                        </div>
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
