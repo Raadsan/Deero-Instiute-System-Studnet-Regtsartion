@@ -33,7 +33,7 @@ type Report = {
     absent: number
     percentage: number | null
   }>
-  totals: { period: number; present: number; absent: number; percentage: number | null }
+  totals: { period: number; periods: number; present: number; absent: number; percentage: number | null }
 }
 
 function currentMonth() {
@@ -283,36 +283,52 @@ export default function TeacherAttendanceReport() {
           )}
 
           {report ? (
-            <div className="pt-6">
-              <div className="mb-6 text-center">
-                <h2 className="text-2xl font-bold sm:text-3xl">Teacher Attendance Report</h2>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {selectedCourse?.name ?? report.courses[0]?.name ?? "Course"} · {report.class.name}
-                  {report.teacher ? ` · ${report.teacher}` : ""}
-                </p>
-                <p className="mt-1 text-sm font-medium text-primary">
-                  {formatReportDate(report.range.from)} – {formatReportDate(report.range.to)}
-                </p>
-              </div>
+            <div className="border-t pt-8">
+              <section aria-labelledby="attendance-report-heading" className="mb-8">
+                <div className="mx-auto max-w-3xl text-center">
+                  <h2
+                    id="attendance-report-heading"
+                    className="text-2xl font-extrabold tracking-tight text-foreground sm:text-3xl"
+                  >
+                    Teacher Attendance Report
+                  </h2>
+                  <p className="mt-2 text-sm font-medium text-muted-foreground sm:text-base">
+                    {[selectedCourse?.name ?? report.courses[0]?.name ?? "Course", report.class.name, report.teacher]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-primary sm:text-base">
+                    {formatReportDate(report.range.from)} – {formatReportDate(report.range.to)}
+                  </p>
+                </div>
 
-              <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-                <Card className="p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attendance Records</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums">{report.totals.period}</p>
-                </Card>
-                <Card className="border-emerald-200 bg-emerald-50/60 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Present</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums text-emerald-800">{report.totals.present}</p>
-                </Card>
-                <Card className="border-orange-200 bg-orange-50/60 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-orange-700">Absent</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums text-orange-800">{report.totals.absent}</p>
-                </Card>
-                <Card className="border-blue-200 bg-blue-50/60 p-4">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Overall Rate</p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums text-[#003D9E]">{report.totals.percentage ?? 0}%</p>
-                </Card>
-              </div>
+                <div className="mt-7 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <Card className="min-h-28 justify-between rounded-xl border-border/80 bg-background p-4 shadow-sm sm:p-5">
+                    <p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Attendance Periods</p>
+                    <p className="text-2xl font-extrabold leading-none tabular-nums text-foreground sm:text-3xl">
+                      {report.totals.periods}
+                    </p>
+                  </Card>
+                  <Card className="min-h-28 justify-between rounded-xl border-emerald-200 bg-emerald-50/70 p-4 shadow-sm dark:border-emerald-900 dark:bg-emerald-950/30 sm:p-5">
+                    <p className="text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">Present</p>
+                    <p className="text-2xl font-extrabold leading-none tabular-nums text-emerald-800 dark:text-emerald-300 sm:text-3xl">
+                      {report.totals.present}
+                    </p>
+                  </Card>
+                  <Card className="min-h-28 justify-between rounded-xl border-orange-200 bg-orange-50/70 p-4 shadow-sm dark:border-orange-900 dark:bg-orange-950/30 sm:p-5">
+                    <p className="text-xs font-bold uppercase tracking-wide text-orange-700 dark:text-orange-400">Absent</p>
+                    <p className="text-2xl font-extrabold leading-none tabular-nums text-orange-800 dark:text-orange-300 sm:text-3xl">
+                      {report.totals.absent}
+                    </p>
+                  </Card>
+                  <Card className="min-h-28 justify-between rounded-xl border-blue-200 bg-blue-50/70 p-4 shadow-sm dark:border-blue-900 dark:bg-blue-950/30 sm:p-5">
+                    <p className="text-xs font-bold uppercase tracking-wide text-blue-700 dark:text-blue-400">Overall Rate</p>
+                    <p className="text-2xl font-extrabold leading-none tabular-nums text-blue-800 dark:text-blue-300 sm:text-3xl">
+                      {report.totals.percentage ?? 0}%
+                    </p>
+                  </Card>
+                </div>
+              </section>
 
               <div className="overflow-x-auto rounded-lg border">
                 <Table>

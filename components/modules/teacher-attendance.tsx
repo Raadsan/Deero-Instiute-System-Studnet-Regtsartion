@@ -52,6 +52,12 @@ function getErrorMessage(error: any) {
   return error?.response?.data?.message ?? error?.message ?? "Something went wrong."
 }
 
+function isInteractiveTarget(target: EventTarget | null) {
+  return target instanceof Element && Boolean(
+    target.closest("button, input, textarea, select, a, label, [role='button'], [role='checkbox']"),
+  )
+}
+
 export default function TeacherAttendance() {
   // Reports live on the dedicated /attendance-report page.
   const showReport = false
@@ -174,6 +180,13 @@ export default function TeacherAttendance() {
       for (const s of filteredStudents) next[s.id] = status
       return next
     })
+  }
+
+  const toggleStudentAttendance = (studentId: string) => {
+    setStatusByStudentId((current) => ({
+      ...current,
+      [studentId]: (current[studentId] ?? "ABSENT") === "PRESENT" ? "ABSENT" : "PRESENT",
+    }))
   }
 
   const filteredStudents = useMemo(() => {
@@ -453,7 +466,9 @@ export default function TeacherAttendance() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-foreground">Mark Attendance</h2>
-          <p className="text-sm text-muted-foreground">Mark attendance and add an excuse or reason for absent students.</p>
+          <p className="text-sm text-muted-foreground">
+            Tap a student row or its checkbox to mark them present. Add a reason only when absent.
+          </p>
         </div>
         <div className="hidden sm:block">
           <Button className="w-full sm:w-auto px-8 rounded-full" onClick={submit} disabled={submitting || loadingStudents || !selectedClassId || !isScheduledDay}>
@@ -548,7 +563,18 @@ export default function TeacherAttendance() {
                 const badgeColor = pct == null ? "bg-muted text-muted-foreground" : pct >= 80 ? "bg-emerald-100 text-emerald-800" : pct >= 50 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
                 
                 return (
-                  <div key={s.id} className="bg-muted/30 p-4 rounded-xl border border-border space-y-3 relative overflow-hidden">
+                  <div
+                    key={s.id}
+                    aria-label={`${s.firstName} ${s.lastName}: ${status}. Tap the card to toggle attendance.`}
+                    onClick={(event) => {
+                      if (!isInteractiveTarget(event.target)) toggleStudentAttendance(s.id)
+                    }}
+                    className={`relative cursor-pointer overflow-hidden rounded-xl border p-4 transition-colors space-y-3 ${
+                      status === "PRESENT"
+                        ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-950/25"
+                        : "border-border bg-muted/30 hover:bg-muted/50"
+                    }`}
+                  >
                     <div className="flex justify-between items-start">
                       <div>
                         <div className="font-bold text-lg mb-1">{s.firstName} {s.lastName}</div>
@@ -620,7 +646,7 @@ export default function TeacherAttendance() {
                     <TableHead className="py-4">Attendance %</TableHead>
                     <TableHead className="py-4">Status</TableHead>
                     <TableHead className="py-4 min-w-[280px]">Excuse / Reason</TableHead>
-                    <TableHead className="py-4 text-right pr-6">Quick Actions</TableHead>
+                    <TableHead className="py-4 text-right pr-6">Present</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -629,7 +655,18 @@ export default function TeacherAttendance() {
                     const pct = s.attendancePercentage
                     const badgeColor = pct == null ? "bg-muted text-muted-foreground" : pct >= 80 ? "bg-emerald-100 text-emerald-800" : pct >= 50 ? "bg-amber-100 text-amber-800" : "bg-rose-100 text-rose-800"
                     return (
-                      <TableRow key={s.id} className="hover:bg-muted/40 transition-colors border-b">
+                      <TableRow
+                        key={s.id}
+                        aria-selected={status === "PRESENT"}
+                        onClick={(event) => {
+                          if (!isInteractiveTarget(event.target)) toggleStudentAttendance(s.id)
+                        }}
+                        className={`cursor-pointer border-b transition-colors ${
+                          status === "PRESENT"
+                            ? "bg-emerald-50/70 hover:bg-emerald-50 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30"
+                            : "hover:bg-muted/40"
+                        }`}
+                      >
                         <TableCell className="pl-6 py-4 font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
                         <TableCell className="py-4 font-bold text-foreground font-medium">
                           {s.firstName} {s.lastName}

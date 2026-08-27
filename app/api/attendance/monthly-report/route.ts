@@ -85,8 +85,10 @@ export async function GET(req: NextRequest) {
 
   const records = await prisma.attendance.findMany({
     where: { classId, date: { gte: range.start, lt: range.end } },
-    select: { studentId: true, status: true },
+    select: { studentId: true, status: true, date: true },
   })
+
+  const attendancePeriods = new Set(records.map((record) => formatInstituteDate(record.date))).size
 
   const counts = new Map<string, { present: number; absent: number }>()
   for (const record of records) {
@@ -128,6 +130,7 @@ export async function GET(req: NextRequest) {
     students,
     totals: {
       ...totals,
+      periods: attendancePeriods,
       percentage: attendancePercentage(totals.present, totals.period),
     },
   })
