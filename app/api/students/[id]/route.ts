@@ -100,7 +100,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext) {
 
   const phone = body.phone ?? null;
   if (enrollment.data.enrollmentStatus === "VISIT_SCHEDULED" && !phone?.trim()) {
-    return NextResponse.json({ message: "Phone number is required for visit scheduled students (WhatsApp)." }, { status: 400 });
+    return NextResponse.json({ message: "Phone number is required for visit reminder SMS messages." }, { status: 400 });
   }
 
   const feeAmountRaw = body.feeAmount

@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma"
 import { buildVisitConfirmationMessage, buildVisitDayReminderMessage, startOfDay } from "@/lib/visit-messages"
-import { enqueueAndSendWhatsAppMessage, hasRecentVisitReminder } from "@/lib/whatsapp-queue"
+import { enqueueAndSendSms, hasVisitSmsReminder } from "@/lib/sms-queue"
 
 export type EnrollmentStatus = "ENROLLED" | "VISIT_SCHEDULED"
 
-export async function sendVisitConfirmationWhatsApp(args: {
+export async function sendVisitConfirmationSms(args: {
   studentId: string
   phone: string | null
   firstName: string
@@ -20,7 +20,7 @@ export async function sendVisitConfirmationWhatsApp(args: {
     visitDate: args.visitDate,
   })
 
-  return enqueueAndSendWhatsAppMessage({
+  return enqueueAndSendSms({
     to: args.phone,
     body,
     meta: {
@@ -58,13 +58,13 @@ export async function processVisitReminders() {
     const phone = student.phone ?? null
     const visitDate = student.visitDate!
 
-    if (await hasRecentVisitReminder({ studentId, visitDate: todayStart })) {
+    if (await hasVisitSmsReminder({ studentId, visitDate: visitDate.toISOString() })) {
       results.push({ studentId, name: firstName, status: "SKIPPED" })
       continue
     }
 
     const body = buildVisitDayReminderMessage({ firstName })
-    const result = await enqueueAndSendWhatsAppMessage({
+    const result = await enqueueAndSendSms({
       to: phone,
       body,
       meta: {

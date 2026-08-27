@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
-import { sendHormuudSms } from "@/lib/sms-hormuud"
+import { enqueueAndSendSms } from "@/lib/sms-queue"
 import { hasRoutePermission } from "@/lib/permissions"
 
 export async function POST(req: NextRequest) {
@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const student = await prisma.student.findUnique({
       where: { id: studentId },
-      select: { phone: true, firstName: true },
+      select: { phone: true, firstName: true, classId: true },
     })
     if (!student) return NextResponse.json({ message: "Student not found" }, { status: 404 })
 
@@ -36,14 +36,27 @@ export async function POST(req: NextRequest) {
     }
 
     const personalMessage = message.trim().replace(/\[\[name\]\]/g, student.firstName || "Student")
-    const result = await sendHormuudSms(student.phone, personalMessage)
+    const result = await enqueueAndSendSms({
+      to: student.phone,
+      body: personalMessage,
+      meta: {
+        kind: "BROADCAST",
+        initiatedBy: session.userId,
+        classId: student.classId ?? "single",
+        courseId: null,
+        studentId,
+      },
+    })
+
+    if (result.status === "SKIPPED") {
+      return NextResponse.json({ message: "Student phone number is not valid for SMS" }, { status: 400 })
+    }
 
     if (!result.ok) {
       return NextResponse.json(
         {
           message: result.error || "Failed to send SMS",
           error: result.error,
-          responseCode: result.responseCode,
         },
         { status: 500 },
       )
@@ -51,7 +64,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      messageId: result.messageId,
+      status: result.status,
     })
   } catch (error: unknown) {
     console.error("SMS single error:", error)

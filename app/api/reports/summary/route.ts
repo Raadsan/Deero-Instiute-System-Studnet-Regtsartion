@@ -22,7 +22,7 @@ function groupAttendanceByDay(
   for (const row of rows) {
     const dayKey = row.date.toISOString().slice(0, 10)
     const existing = byDay.get(dayKey) ?? { present: 0, absent: 0 }
-    if (row.status === "PRESENT") existing.present++
+    if (row.status === "PRESENT" || row.status === "LATE") existing.present++
     if (row.status === "ABSENT") existing.absent++
     byDay.set(dayKey, existing)
   }
@@ -117,7 +117,7 @@ export async function GET() {
   for (const row of absenceStats) {
     if (!row.classId) continue
     const entry = absenceByClass.get(row.classId) ?? { present: 0, absent: 0 }
-    if (row.status === "PRESENT") entry.present += row._count._all
+    if (row.status === "PRESENT" || row.status === "LATE") entry.present += row._count._all
     if (row.status === "ABSENT") entry.absent += row._count._all
     absenceByClass.set(row.classId, entry)
   }

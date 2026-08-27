@@ -2,11 +2,14 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
 import { getWeekdayFromDateInput } from "@/lib/class-schedule"
-import { parseInstituteDay } from "@/lib/institute-date"
-import { enqueueAndSendWhatsAppMessage, hasRecentAbsenceAlert } from "@/lib/whatsapp-queue"
-import { enqueueAndSendEmailMessage, hasRecentAbsenceEmailAlert } from "@/lib/email-queue"
-import { buildBroadcastEmailTemplate } from "@/lib/email-templates"
-import { getBrandName } from "@/lib/brand"
+import { formatInstituteDate, parseInstituteDay } from "@/lib/institute-date"
+import { isAttendanceStatus, type AttendanceStatus } from "@/lib/attendance-status"
+import {
+  buildConsecutiveAbsenceSms,
+  CONSECUTIVE_ABSENCE_THRESHOLD,
+  isNewConsecutiveAbsenceStreak,
+} from "@/lib/attendance-notifications"
+import { enqueueAndSendSms, hasAbsenceSmsAlert } from "@/lib/sms-queue"
 
 export async function POST(req: Request) {
   const session = await getSessionFromRequestCookies()
@@ -34,7 +37,7 @@ export async function POST(req: Request) {
     const candidate = item as Record<string, unknown>
     return (
       typeof candidate.studentId !== "string" ||
-      (candidate.status !== "PRESENT" && candidate.status !== "ABSENT") ||
+      !isAttendanceStatus(candidate.status) ||
       (candidate.note !== undefined && typeof candidate.note !== "string") ||
       (typeof candidate.note === "string" && candidate.note.trim().length > 500)
     )
@@ -44,14 +47,14 @@ export async function POST(req: Request) {
   }
 
   const items = rawItems.map((item) => {
-    const candidate = item as { studentId: string; status: "PRESENT" | "ABSENT"; note?: string }
-    const note = candidate.status === "ABSENT" ? candidate.note?.trim() || undefined : undefined
+    const candidate = item as { studentId: string; status: AttendanceStatus; note?: string }
+    const note = candidate.status !== "PRESENT" ? candidate.note?.trim() || undefined : undefined
     return { studentId: candidate.studentId, status: candidate.status, note }
   })
 
   const cls = await prisma.class.findUnique({
     where: { id: classId },
-    select: { teacherId: true, isActive: true, scheduleDays: true },
+    select: { teacherId: true, isActive: true, scheduleDays: true, name: true },
   })
   if (!cls) return NextResponse.json({ message: "Class not found" }, { status: 404 })
   if (!cls.isActive) return NextResponse.json({ message: "Class is inactive" }, { status: 400 })
@@ -72,7 +75,7 @@ export async function POST(req: Request) {
 
   const students = await prisma.student.findMany({
     where: { studentCode: { in: uniqueStudentCodes }, classId, isActive: true, isHidden: false },
-    select: { id: true, studentCode: true },
+    select: { id: true, studentCode: true, firstName: true, phone: true },
   })
 
   if (students.length !== uniqueStudentCodes.length) {
@@ -109,84 +112,70 @@ export async function POST(req: Request) {
 
   const created = await prisma.attendance.createMany({ data: docs })
 
-  const channel = (process.env.NOTIFICATIONS_CHANNEL ?? "email").toLowerCase()
-
   const absentStudentIds = Array.from(new Set(resolvedItems.filter((x) => x.status === "ABSENT").map((x) => x.studentId)))
+  const smsResults: Array<{ studentId: string; status: "SENT" | "SKIPPED" | "FAILED" }> = []
   if (absentStudentIds.length) {
-    const windowDays = 30
-    const threshold = 3
-    const since = new Date(dayStart)
-    since.setDate(since.getDate() - windowDays)
-
-    const phones = await prisma.student.findMany({
-      where: { id: { in: absentStudentIds } },
-      select: { id: true, firstName: true, lastName: true, phone: true, email: true, classId: true },
+    const recentSessions = await prisma.attendance.findMany({
+      where: { classId, date: { lt: dayEnd } },
+      select: { date: true },
+      distinct: ["date"],
+      orderBy: { date: "desc" },
+      take: CONSECUTIVE_ABSENCE_THRESHOLD + 1,
     })
+    const sessionDates = recentSessions.map((session) => session.date)
+    if (sessionDates.length >= CONSECUTIVE_ABSENCE_THRESHOLD) {
+      const recentAttendance = await prisma.attendance.findMany({
+        where: { classId, studentId: { in: absentStudentIds }, date: { in: sessionDates } },
+        select: { studentId: true, date: true, status: true },
+      })
+      const statusByStudentAndDate = new Map(
+        recentAttendance.map((record) => [`${record.studentId}:${record.date.getTime()}`, record.status]),
+      )
+      const studentById = new Map(students.map((student) => [student.id, student]))
 
-    const phoneMap = new Map<string, { name: string; phone: string | null }>(
-      phones.map((s) => [
-        s.id,
-        { name: `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() || "Student", phone: s.phone ?? null },
-      ]),
-    )
+      await Promise.all(absentStudentIds.map(async (studentId) => {
+        try {
+          const statuses = sessionDates.map(
+            (sessionDate) => statusByStudentAndDate.get(`${studentId}:${sessionDate.getTime()}`) ?? "NOT_MARKED",
+          )
+          if (!isNewConsecutiveAbsenceStreak(statuses)) return
 
-    const emailMap = new Map<string, { name: string; email: string | null }>(
-      phones.map((s) => [
-        s.id,
-        { name: `${s.firstName ?? ""} ${s.lastName ?? ""}`.trim() || "Student", email: s.email ?? null },
-      ]),
-    )
+          const streakStartDate = formatInstituteDate(sessionDates[CONSECUTIVE_ABSENCE_THRESHOLD - 1])
+          const streakEndDate = formatInstituteDate(sessionDates[0])
+          if (await hasAbsenceSmsAlert({ studentId, classId, streakEndDate })) return
 
-    await Promise.all(
-      absentStudentIds.map(async (studentId) => {
-        const count = await prisma.attendance.count({
-          where: {
-            studentId,
-            classId,
-            status: "ABSENT",
-            date: { gte: since, lte: dayStart },
-          },
-        })
-
-        if (count < threshold) return
-
-        const msg = `Attendance Alert: ${emailMap.get(studentId)?.name ?? "Student"} has been absent ${threshold} times in the last ${windowDays} days. Please ensure attendance improves.`
-
-        if (channel === "whatsapp" || channel === "both") {
-          const already = await hasRecentAbsenceAlert({ studentId, classId, absentCount: threshold, withinDays: windowDays })
-          if (!already) {
-            const info = phoneMap.get(studentId) ?? { name: "Student", phone: null }
-            await enqueueAndSendWhatsAppMessage({
-              to: info.phone,
-              body: msg,
-              meta: { kind: "ABSENCE_ALERT", studentId, classId, absentCount: threshold, windowDays },
-            })
-          }
-        }
-
-        if (channel === "email" || channel === "both") {
-          const already = await hasRecentAbsenceEmailAlert({ studentId, classId, absentCount: threshold, withinDays: windowDays })
-          if (already) return
-          const info = emailMap.get(studentId) ?? { name: "Student", email: null }
-          const template = buildBroadcastEmailTemplate({
-            subject: "Attendance Alert",
-            message: msg,
-            contextTitle: "Attendance Alert",
-            contextSubtitle: `Class: ${classId}`,
-            logoCid: "brandlogo",
-            brandName: getBrandName(),
+          const student = studentById.get(studentId)
+          const result = await enqueueAndSendSms({
+            to: student?.phone ?? null,
+            body: buildConsecutiveAbsenceSms({
+              firstName: student?.firstName ?? "Arday",
+              className: cls.name,
+            }),
+            meta: {
+              kind: "ABSENCE_ALERT",
+              studentId,
+              classId,
+              consecutiveAbsences: CONSECUTIVE_ABSENCE_THRESHOLD,
+              streakStartDate,
+              streakEndDate,
+            },
           })
-          await enqueueAndSendEmailMessage({
-            to: info.email,
-            subject: "Attendance Alert",
-            text: template.text,
-            html: template.html,
-            meta: { kind: "ABSENCE_ALERT", studentId, classId, absentCount: threshold, windowDays },
-          })
+          smsResults.push({ studentId, status: result.status })
+        } catch (error) {
+          console.error(`Automatic absence SMS failed for student ${studentId}:`, error)
+          smsResults.push({ studentId, status: "FAILED" })
         }
-      }),
-    )
+      }))
+    }
   }
 
-  return NextResponse.json({ ok: true, count: created.count })
+  return NextResponse.json({
+    ok: true,
+    count: created.count,
+    sms: {
+      sent: smsResults.filter((result) => result.status === "SENT").length,
+      skipped: smsResults.filter((result) => result.status === "SKIPPED").length,
+      failed: smsResults.filter((result) => result.status === "FAILED").length,
+    },
+  })
 }

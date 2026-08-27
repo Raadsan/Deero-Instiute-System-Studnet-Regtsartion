@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
+import { calculateAttendancePercentage } from "@/lib/attendance-status"
 import { formatInstituteDate, parseInstituteDay } from "@/lib/institute-date"
 
 export async function GET(req: NextRequest) {
@@ -62,9 +63,10 @@ export async function GET(req: NextRequest) {
 
   const studentMap = new Map(
     students.map((s) => {
-      const total = s.attendances.length
       const presentCount = s.attendances.filter(a => a.status === "PRESENT").length
-      const percentage = total > 0 ? Math.round((presentCount / total) * 100) : null
+      const lateCount = s.attendances.filter(a => a.status === "LATE").length
+      const absentCount = s.attendances.filter(a => a.status === "ABSENT").length
+      const percentage = calculateAttendancePercentage(presentCount, lateCount, absentCount)
       
       return [
         s.id,

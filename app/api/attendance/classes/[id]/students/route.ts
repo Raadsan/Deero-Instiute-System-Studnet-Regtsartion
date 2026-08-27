@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
+import { calculateAttendancePercentage, type AttendanceStatus } from "@/lib/attendance-status"
 import { getWeekdayFromDateInput } from "@/lib/class-schedule"
 import { parseInstituteDay } from "@/lib/institute-date"
 
@@ -27,7 +28,7 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
   const dateStr = searchParams.get("date")
 
   let isScheduledDay = false
-  let attendanceRecords: Array<{ studentId: string; status: "PRESENT" | "ABSENT"; note: string | null }> = []
+  let attendanceRecords: Array<{ studentId: string; status: AttendanceStatus; note: string | null }> = []
 
   if (dateStr) {
     const range = parseInstituteDay(dateStr)
@@ -93,9 +94,10 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     scheduleDays,
     isScheduledDay: true,
     students: students.map((s) => {
-      const total = s.attendances.length
       const presentCount = s.attendances.filter(a => a.status === "PRESENT").length
-      const percentage = total > 0 ? Math.round((presentCount / total) * 100) : null
+      const lateCount = s.attendances.filter(a => a.status === "LATE").length
+      const absentCount = s.attendances.filter(a => a.status === "ABSENT").length
+      const percentage = calculateAttendancePercentage(presentCount, lateCount, absentCount)
       
       return { 
         id: s.studentCode ?? "UNASSIGNED",

@@ -31,9 +31,21 @@ type Report = {
     period: number
     present: number
     absent: number
+    late: number
+    excused: number
+    leave: number
     percentage: number | null
   }>
-  totals: { period: number; periods: number; present: number; absent: number; percentage: number | null }
+  totals: {
+    period: number
+    periods: number
+    present: number
+    absent: number
+    late: number
+    excused: number
+    leave: number
+    percentage: number | null
+  }
 }
 
 function currentMonth() {
@@ -328,6 +340,21 @@ export default function TeacherAttendanceReport() {
                     </p>
                   </Card>
                 </div>
+
+                <div className="mt-3 grid grid-cols-3 overflow-hidden rounded-xl border bg-muted/20 divide-x">
+                  <div className="px-3 py-3 text-center sm:px-5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-amber-700 dark:text-amber-400">Late</p>
+                    <p className="mt-1 text-lg font-extrabold tabular-nums text-amber-800 dark:text-amber-300">{report.totals.late}</p>
+                  </div>
+                  <div className="px-3 py-3 text-center sm:px-5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-sky-700 dark:text-sky-400">Excused</p>
+                    <p className="mt-1 text-lg font-extrabold tabular-nums text-sky-800 dark:text-sky-300">{report.totals.excused}</p>
+                  </div>
+                  <div className="px-3 py-3 text-center sm:px-5">
+                    <p className="text-[10px] font-bold uppercase tracking-wide text-violet-700 dark:text-violet-400">Leave</p>
+                    <p className="mt-1 text-lg font-extrabold tabular-nums text-violet-800 dark:text-violet-300">{report.totals.leave}</p>
+                  </div>
+                </div>
               </section>
 
               <div className="overflow-x-auto rounded-lg border">
@@ -338,7 +365,10 @@ export default function TeacherAttendanceReport() {
                       <TableHead className="text-base font-semibold text-foreground">Name</TableHead>
                       <TableHead className="text-center text-base font-semibold text-foreground">Period</TableHead>
                       <TableHead className="text-center text-base font-semibold text-foreground">Present</TableHead>
+                      <TableHead className="text-center text-base font-semibold text-foreground">Late</TableHead>
                       <TableHead className="text-center text-base font-semibold text-foreground">Absent</TableHead>
+                      <TableHead className="text-center text-base font-semibold text-foreground">Excused</TableHead>
+                      <TableHead className="text-center text-base font-semibold text-foreground">Leave</TableHead>
                       <TableHead 
                         className="pr-6 text-right text-base font-semibold text-foreground cursor-pointer hover:bg-muted/50 select-none transition-colors"
                         onClick={() => setSortOrder(prev => prev === "asc" ? "desc" : prev === "desc" ? null : "asc")}
@@ -357,7 +387,10 @@ export default function TeacherAttendanceReport() {
                         <TableCell className="font-medium whitespace-nowrap">{item.name}</TableCell>
                         <TableCell className="text-center tabular-nums">{item.period}</TableCell>
                         <TableCell className="text-center tabular-nums">{item.present}</TableCell>
+                        <TableCell className="text-center tabular-nums text-amber-700">{item.late}</TableCell>
                         <TableCell className="text-center tabular-nums">{item.absent}</TableCell>
+                        <TableCell className="text-center tabular-nums text-sky-700">{item.excused}</TableCell>
+                        <TableCell className="text-center tabular-nums text-violet-700">{item.leave}</TableCell>
                         <TableCell className="pr-6 text-right font-semibold tabular-nums">
                           <Badge variant="outline" className={`min-w-16 justify-center ${percentageColor(item.percentage)}`}>
                             {`${item.percentage ?? 0}%`}
@@ -366,7 +399,7 @@ export default function TeacherAttendanceReport() {
                       </TableRow>
                     ))}
                     {!rows.length && (
-                      <TableRow><TableCell colSpan={6} className="h-28 text-center text-muted-foreground">No attendance information found.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="h-28 text-center text-muted-foreground">No attendance information found.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>

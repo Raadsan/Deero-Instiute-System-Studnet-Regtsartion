@@ -45,7 +45,7 @@ export async function GET() {
   for (const record of records) {
     const daily = dailyMap.get(dayKey(record.date)) ?? { present: 0, absent: 0 }
     const classCount = classMap.get(record.classId) ?? { present: 0, absent: 0 }
-    if (record.status === "PRESENT") {
+    if (record.status === "PRESENT" || record.status === "LATE") {
       daily.present++
       classCount.present++
       present++

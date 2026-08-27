@@ -43,6 +43,7 @@ import {
   ChartLegendContent,
   type ChartConfig,
 } from "@/components/ui/chart"
+import AdvancedAttendanceReports from "@/components/modules/advanced-attendance-reports"
 
 type AdminReport = {
   range: { from: string; to: string; label: string }
@@ -455,6 +456,7 @@ export default function ReportsView() {
               <TabsTrigger value="money">Money</TabsTrigger>
               <TabsTrigger value="students">Students</TabsTrigger>
               <TabsTrigger value="attendance">Attendance</TabsTrigger>
+              <TabsTrigger value="advanced-attendance">Advanced Attendance</TabsTrigger>
               <TabsTrigger value="payroll">Payroll & Partners</TabsTrigger>
               <TabsTrigger value="transactions">Transactions</TabsTrigger>
             </TabsList>
@@ -695,6 +697,10 @@ export default function ReportsView() {
                   </Table>
                 </div>
               </Card>
+            </TabsContent>
+
+            <TabsContent value="advanced-attendance" className="space-y-6">
+              <AdvancedAttendanceReports />
             </TabsContent>
 
             <TabsContent value="payroll" className="space-y-6">

@@ -12,6 +12,7 @@ import { api } from "@/lib/api"
 import { toast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { ATTENDANCE_STATUS_OPTIONS, type AttendanceStatus } from "@/lib/attendance-status"
 import {
   Dialog,
   DialogClose,
@@ -28,6 +29,9 @@ type AttendanceSummaryRow = {
   class: { id: string; name: string; level: string | null }
   presentCount: number
   absentCount: number
+  lateCount: number
+  excusedCount: number
+  leaveCount: number
   total: number
   unmarkedCount: number
   percentage: number
@@ -39,7 +43,7 @@ type AttendanceSummaryResponse = { date: string; data: AttendanceSummaryRow[] }
 type AttendanceRecordRow = {
   id: string
   class: { id: string; name: string; level: string | null }
-  status: "PRESENT" | "ABSENT" | "NOT_MARKED"
+  status: AttendanceStatus | "NOT_MARKED"
   note: string | null
   student: {
     id: string
@@ -76,9 +80,21 @@ type MonthlyReportResponse = {
     period: number
     present: number
     absent: number
+    late: number
+    excused: number
+    leave: number
     percentage: number | null
   }>
-  totals: { period: number; present: number; absent: number; percentage: number | null }
+  totals: {
+    period: number
+    periods: number
+    present: number
+    absent: number
+    late: number
+    excused: number
+    leave: number
+    percentage: number | null
+  }
 }
 
 const ALL_CLASS_VALUE = "__all__"
@@ -105,9 +121,16 @@ function formatPersonName(firstName: string, lastName: string) {
 }
 
 function statusLabel(status: AttendanceRecordRow["status"]) {
-  if (status === "PRESENT") return "Present"
-  if (status === "ABSENT") return "Absent"
-  return "Not marked"
+  return ATTENDANCE_STATUS_OPTIONS.find((option) => option.value === status)?.label ?? "Not marked"
+}
+
+function statusBadgeClass(status: AttendanceRecordRow["status"]) {
+  if (status === "PRESENT") return "border-emerald-200 bg-emerald-50 text-emerald-700"
+  if (status === "ABSENT") return "border-rose-200 bg-rose-50 text-rose-700"
+  if (status === "LATE") return "border-amber-200 bg-amber-50 text-amber-700"
+  if (status === "EXCUSED") return "border-sky-200 bg-sky-50 text-sky-700"
+  if (status === "LEAVE") return "border-violet-200 bg-violet-50 text-violet-700"
+  return "border-slate-200 bg-slate-50 text-slate-600"
 }
 
 export default function AttendanceView() {
@@ -235,23 +258,25 @@ export default function AttendanceView() {
       (acc, row) => ({
         present: acc.present + row.presentCount,
         absent: acc.absent + row.absentCount,
+        late: acc.late + row.lateCount,
+        excused: acc.excused + row.excusedCount,
+        leave: acc.leave + row.leaveCount,
       }),
-      { present: 0, absent: 0 },
+      { present: 0, absent: 0, late: 0, excused: 0, leave: 0 },
     )
   }, [summaryRows])
 
   const dayRate = useMemo(() => {
-    const total = dayTotals.present + dayTotals.absent
-    return total > 0 ? Math.round((dayTotals.present / total) * 100) : 0
+    const attended = dayTotals.present + dayTotals.late
+    const total = attended + dayTotals.absent
+    return total > 0 ? Math.round((attended / total) * 100) : 0
   }, [dayTotals])
 
   const filteredRecords = useMemo(() => {
     if (!records?.data) return []
     return records.data.filter((r) => {
       // Status Filter
-      if (statusFilter === "PRESENT" && r.status !== "PRESENT") return false
-      if (statusFilter === "ABSENT" && r.status !== "ABSENT") return false
-      if (statusFilter === "EXCUSED" && (r.status !== "ABSENT" || !r.note?.trim())) return false
+      if (statusFilter !== "ALL" && statusFilter !== "NOT_MARKED" && r.status !== statusFilter) return false
       if (statusFilter === "NOT_MARKED" && r.status !== "NOT_MARKED") return false
       
       // Gender Filter
@@ -322,10 +347,13 @@ export default function AttendanceView() {
                 {dayRate}% attendance today
               </div>
               <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-medium text-emerald-700">
-                {dayTotals.present} present
+                {dayTotals.present + dayTotals.late} attended
               </div>
               <div className="inline-flex items-center gap-2 rounded-full bg-rose-50 border border-rose-200 px-3 py-1 text-xs font-medium text-rose-700">
                 {dayTotals.absent} absent
+              </div>
+              <div className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-medium text-sky-700">
+                {dayTotals.excused + dayTotals.leave} approved away
               </div>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">Attendance Management</h1>
@@ -431,8 +459,8 @@ export default function AttendanceView() {
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
                     <div className="rounded-xl bg-emerald-50 border border-emerald-100 py-2.5 px-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Present</p>
-                      <p className="text-lg font-bold text-emerald-800 tabular-nums">{row.presentCount}</p>
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Attended</p>
+                      <p className="text-lg font-bold text-emerald-800 tabular-nums">{row.presentCount + row.lateCount}</p>
                     </div>
                     <div className="rounded-xl bg-rose-50 border border-rose-100 py-2.5 px-2">
                       <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700">Absent</p>
@@ -442,6 +470,11 @@ export default function AttendanceView() {
                       <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Total</p>
                       <p className="text-lg font-bold text-foreground tabular-nums">{row.total}</p>
                     </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap justify-center gap-x-3 gap-y-1 text-[11px] font-medium text-muted-foreground">
+                    <span className="text-amber-700">{row.lateCount} late</span>
+                    <span className="text-sky-700">{row.excusedCount} excused</span>
+                    <span className="text-violet-700">{row.leaveCount} leave</span>
                   </div>
                 </Card>
               ))}
@@ -484,9 +517,9 @@ export default function AttendanceView() {
                      </SelectTrigger>
                      <SelectContent>
                        <SelectItem value="ALL">All Statuses</SelectItem>
-                       <SelectItem value="PRESENT">Present</SelectItem>
-                       <SelectItem value="ABSENT">Absent</SelectItem>
-                       <SelectItem value="EXCUSED">Excused Absence</SelectItem>
+                        {ATTENDANCE_STATUS_OPTIONS.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                        ))}
                        <SelectItem value="NOT_MARKED">Not Marked</SelectItem>
                      </SelectContent>
                    </Select>
@@ -554,37 +587,26 @@ export default function AttendanceView() {
                         <TableCell className="py-4 align-middle text-center">
                           <Badge
                             variant="secondary"
-                            className={`inline-flex min-w-[80px] justify-center rounded-full shadow-none px-3 py-1 text-xs font-semibold ${
-                              r.status === "PRESENT"
-                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
-                                : r.status === "ABSENT"
-                                  ? "bg-rose-50 text-rose-700 border border-rose-200"
-                                  : "bg-slate-50 text-slate-600 border border-slate-200"
-                            }`}
+                            className={`inline-flex min-w-[80px] justify-center rounded-full border px-3 py-1 text-xs font-semibold shadow-none ${statusBadgeClass(r.status)}`}
                           >
                             {statusLabel(r.status)}
                           </Badge>
                         </TableCell>
                         <TableCell className="py-4 align-middle">
-                          {r.status === "ABSENT" ? (
+                          {r.status !== "PRESENT" && r.status !== "NOT_MARKED" ? (
                             r.note?.trim() ? (
-                              <div className="flex flex-col items-start gap-2">
-                                <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-800">
-                                  Excused
-                                </Badge>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8 gap-1.5"
-                                  onClick={() => setSelectedExcuse(r)}
-                                >
-                                  <FileText className="h-3.5 w-3.5" />
-                                  View excuse
-                                </Button>
-                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1.5"
+                                onClick={() => setSelectedExcuse(r)}
+                              >
+                                <FileText className="h-3.5 w-3.5" />
+                                View note
+                              </Button>
                             ) : (
-                              <span className="text-sm text-muted-foreground">No excuse provided</span>
+                              <span className="text-sm text-muted-foreground">No note provided</span>
                             )
                           ) : (
                             <span className="text-muted-foreground">—</span>
@@ -665,7 +687,10 @@ export default function AttendanceView() {
                       <TableHead>Name</TableHead>
                       <TableHead className="text-center">Period</TableHead>
                       <TableHead className="text-center">Present</TableHead>
+                      <TableHead className="text-center">Late</TableHead>
                       <TableHead className="text-center">Absent</TableHead>
+                      <TableHead className="text-center">Excused</TableHead>
+                      <TableHead className="text-center">Leave</TableHead>
                       <TableHead className="text-right pr-6">Percentage</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -676,7 +701,10 @@ export default function AttendanceView() {
                         <TableCell className="font-semibold">{student.name}</TableCell>
                         <TableCell className="text-center tabular-nums">{student.period}</TableCell>
                         <TableCell className="text-center font-semibold text-emerald-700 tabular-nums">{student.present}</TableCell>
+                        <TableCell className="text-center font-semibold text-amber-700 tabular-nums">{student.late}</TableCell>
                         <TableCell className="text-center font-semibold text-rose-700 tabular-nums">{student.absent}</TableCell>
+                        <TableCell className="text-center font-semibold text-sky-700 tabular-nums">{student.excused}</TableCell>
+                        <TableCell className="text-center font-semibold text-violet-700 tabular-nums">{student.leave}</TableCell>
                         <TableCell className="text-right pr-6">
                           <Badge variant="outline" className={student.percentage == null ? "text-muted-foreground" : student.percentage >= 80 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}>
                             {student.percentage == null ? "No records" : `${student.percentage}%`}
@@ -685,7 +713,7 @@ export default function AttendanceView() {
                       </TableRow>
                     ))}
                     {!filteredMonthlyStudents.length && (
-                      <TableRow><TableCell colSpan={6} className="h-24 text-center text-muted-foreground">No students found.</TableCell></TableRow>
+                      <TableRow><TableCell colSpan={9} className="h-24 text-center text-muted-foreground">No students found.</TableCell></TableRow>
                     )}
                   </TableBody>
                 </Table>
@@ -701,9 +729,9 @@ export default function AttendanceView() {
             <div className="mb-1 flex h-11 w-11 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
               <FileText className="h-5 w-5" />
             </div>
-            <DialogTitle>Attendance Excuse</DialogTitle>
+            <DialogTitle>Attendance Note</DialogTitle>
             <DialogDescription>
-              The excuse or absence reason submitted by the teacher.
+              The note or reason submitted by the teacher for this attendance status.
             </DialogDescription>
           </DialogHeader>
 
@@ -730,10 +758,16 @@ export default function AttendanceView() {
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Date</p>
                   <p className="mt-1 font-semibold">{date}</p>
                 </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Status</p>
+                  <Badge variant="outline" className={`mt-1 ${statusBadgeClass(selectedExcuse.status)}`}>
+                    {statusLabel(selectedExcuse.status)}
+                  </Badge>
+                </div>
               </div>
 
               <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Teacher&apos;s excuse / reason</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-800">Teacher&apos;s note / reason</p>
                 <p className="mt-2 whitespace-pre-wrap break-words text-base leading-7 text-foreground">
                   {selectedExcuse.note}
                 </p>

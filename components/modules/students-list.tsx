@@ -321,7 +321,7 @@ export default function StudentsList() {
     if (enrollmentStatus === "VISIT_SCHEDULED" && !phone.trim()) {
       toast({
         title: "Phone required",
-        description: "Visit scheduled students need a phone number for WhatsApp messages.",
+        description: "Visit scheduled students need a phone number for SMS messages.",
         variant: "destructive",
       })
       return
@@ -400,29 +400,27 @@ export default function StudentsList() {
       } else {
         const res = await api.post("/api/students", payload)
         savedPaymentId = typeof res.data?.paymentId === "string" ? res.data.paymentId : null
-        const confirmation = res.data?.whatsappConfirmation
+        const confirmation = res.data?.smsConfirmation
         if (enrollmentStatus === "VISIT_SCHEDULED") {
           if (confirmation?.status === "SENT") {
             toast({
               title: "Prospect registered",
-              description: "WhatsApp confirmation sent with the visit date.",
+              description: "SMS confirmation sent with the visit date.",
             })
           } else if (confirmation?.status === "FAILED") {
             const detail =
-              typeof confirmation?.error === "string" && confirmation.error.includes("your-meta-whatsapp")
-                ? "WhatsApp is not configured. Add real WHATSAPP_TOKEN and WHATSAPP_PHONE_NUMBER_ID in .env."
-                : typeof confirmation?.error === "string" && confirmation.error.length < 120
-                  ? confirmation.error
-                  : "WhatsApp could not send. Check .env WhatsApp settings and use phone with country code (e.g. 252...)."
+              typeof confirmation?.error === "string" && confirmation.error.length < 120
+                ? confirmation.error
+                : "SMS could not send. Check the Hormuud SMS settings and the student phone number."
             toast({
               title: "Prospect registered",
-              description: `Saved, but WhatsApp confirmation failed. ${detail}`,
+              description: `Saved, but SMS confirmation failed. ${detail}`,
               variant: "destructive",
             })
           } else {
             toast({
               title: "Prospect registered",
-              description: "Visit scheduled. WhatsApp reminder will be sent on that day.",
+              description: "Visit scheduled. An SMS reminder will be sent on that day.",
             })
           }
         } else {
@@ -1157,7 +1155,7 @@ export default function StudentsList() {
                   id="phone"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder={enrollmentStatus === "VISIT_SCHEDULED" ? "Required for WhatsApp" : "optional"}
+                  placeholder={enrollmentStatus === "VISIT_SCHEDULED" ? "Required for SMS" : "optional"}
                 />
               </div>
             </div>
@@ -1167,7 +1165,7 @@ export default function StudentsList() {
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">Visit details</p>
                   <p className="text-xs text-amber-800/80 dark:text-amber-200/90">
-                    WhatsApp confirmation is sent now. On the visit day, the system sends a reminder automatically.
+                    An SMS confirmation is sent now. On the visit day, the system sends an SMS reminder automatically.
                   </p>
                 </div>
                 <div className="space-y-2">

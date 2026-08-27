@@ -16,17 +16,18 @@ import { Badge } from "@/components/ui/badge"
 
 type ClassOption = { id: string; name: string; level: string | null; isActive: boolean }
 type CourseOption = { id: string; name: string; classId: string | null; status: string }
-type EmailLogRow = {
+type DeliveryLogRow = {
   id: string
   to: string | null
-  subject: string | null
+  subject?: string | null
+  body?: string | null
   status: string | null
   error: string | null
   createdAt: string | null
 }
 
 type TargetType = "CLASS" | "COURSE" | "SINGLE"
-type MessageMode = "EMAIL" | "WHATSAPP" | "SMS"
+type MessageMode = "EMAIL" | "SMS"
 
 type StudentOption = {
   id: string
@@ -49,7 +50,6 @@ function studentHasContact(student: StudentOption, mode: MessageMode) {
 }
 
 function modeLabel(mode: MessageMode) {
-  if (mode === "WHATSAPP") return "WhatsApp"
   if (mode === "SMS") return "SMS (Hormuud)"
   return "Email"
 }
@@ -70,7 +70,7 @@ export default function MessagesCenter() {
   const [sending, setSending] = useState(false)
   const [reloading, setReloading] = useState(false)
 
-  const [mode, setMode] = useState<MessageMode>("WHATSAPP")
+  const [mode, setMode] = useState<MessageMode>("SMS")
   const [targetType, setTargetType] = useState<TargetType>("CLASS")
   const [classId, setClassId] = useState<string>("")
   const [courseId, setCourseId] = useState<string>("")
@@ -78,7 +78,7 @@ export default function MessagesCenter() {
 
   const [subject, setSubject] = useState("")
   const [message, setMessage] = useState("")
-  const [failures, setFailures] = useState<EmailLogRow[]>([])
+  const [failures, setFailures] = useState<DeliveryLogRow[]>([])
   const [loadingFailures, setLoadingFailures] = useState(false)
 
   const load = async (loadMode: "initial" | "refresh") => {
@@ -148,12 +148,7 @@ export default function MessagesCenter() {
     setSending(true)
     try {
       if (targetType === "SINGLE") {
-        const endpoint =
-          mode === "EMAIL"
-            ? "/api/notifications/email/single"
-            : mode === "SMS"
-              ? "/api/notifications/sms/single"
-              : "/api/notifications/whatsapp/single"
+        const endpoint = mode === "EMAIL" ? "/api/notifications/email/single" : "/api/notifications/sms/single"
         const payload =
           mode === "EMAIL"
             ? { studentId, subject: subject.trim(), message: message.trim() }
@@ -165,12 +160,7 @@ export default function MessagesCenter() {
           description: `${modeLabel(mode)} delivered to the student.`,
         })
       } else {
-        const endpoint =
-          mode === "EMAIL"
-            ? "/api/notifications/email/broadcast"
-            : mode === "SMS"
-              ? "/api/notifications/sms/broadcast"
-              : "/api/notifications/whatsapp/broadcast"
+        const endpoint = mode === "EMAIL" ? "/api/notifications/email/broadcast" : "/api/notifications/sms/broadcast"
 
         const payload =
           targetType === "COURSE"
@@ -200,9 +190,14 @@ export default function MessagesCenter() {
   const loadFailures = async () => {
     setLoadingFailures(true)
     try {
-      const res = await api.get<EmailLogRow[]>("/api/notifications/email/logs?status=FAILED&limit=20")
+      const endpoint = mode === "EMAIL"
+        ? "/api/notifications/email/logs?status=FAILED&limit=20"
+        : "/api/notifications/sms/logs?status=FAILED&limit=20"
+      const res = await api.get<DeliveryLogRow[]>(endpoint)
       setFailures(res.data)
-      if (!res.data.length) toast({ title: "All good", description: "No failed emails in the last 20 attempts." })
+      if (!res.data.length) {
+        toast({ title: "All good", description: `No failed ${modeLabel(mode)} deliveries in the last 20 attempts.` })
+      }
     } catch (e: any) {
       toast({ title: "Failed to load logs", description: getErrorMessage(e), variant: "destructive" })
     } finally {
@@ -221,14 +216,6 @@ export default function MessagesCenter() {
   }, [students, mode])
 
   const channelOptions = [
-    {
-      value: "WHATSAPP" as const,
-      label: "WhatsApp",
-      desc: "Send to students who have a phone number saved.",
-      icon: MessageSquare,
-      activeBorder: "border-emerald-500 bg-emerald-50/60 ring-2 ring-emerald-500/20",
-      iconActive: "bg-emerald-500 text-white",
-    },
     {
       value: "SMS" as const,
       label: "SMS Hormuud",
@@ -266,7 +253,7 @@ export default function MessagesCenter() {
               </div>
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Send a Message</h1>
               <p className="text-sm text-muted-foreground">
-                WhatsApp, SMS Hormuud, or Email — pick a channel, choose recipients, and send.
+                Send clean messages through SMS Hormuud or Email.
               </p>
             </div>
           </div>
@@ -285,7 +272,7 @@ export default function MessagesCenter() {
               <h2 className="text-lg font-semibold">How do you want to send?</h2>
             </div>
             <div className="p-4 sm:p-5 space-y-4">
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+              <div className="grid grid-cols-2 gap-2 sm:gap-3">
                 {channelOptions.map((opt) => {
                   const Icon = opt.icon
                   const active = mode === opt.value
@@ -293,7 +280,10 @@ export default function MessagesCenter() {
                     <button
                       key={opt.value}
                       type="button"
-                      onClick={() => setMode(opt.value)}
+                      onClick={() => {
+                        setMode(opt.value)
+                        setFailures([])
+                      }}
                       className={`flex flex-col items-center justify-center gap-2.5 rounded-xl border-2 px-2 py-4 sm:py-5 transition-all text-center ${
                         active ? `${opt.activeBorder} shadow-sm` : "border-muted hover:border-muted-foreground/25 hover:bg-muted/30"
                       }`}
@@ -460,7 +450,7 @@ export default function MessagesCenter() {
                   variant="ghost"
                   size="sm"
                   onClick={loadFailures}
-                  disabled={sending || loadingFailures || mode !== "EMAIL"}
+                  disabled={sending || loadingFailures}
                   className="text-muted-foreground rounded-full"
                 >
                   {loadingFailures ? (
@@ -471,7 +461,7 @@ export default function MessagesCenter() {
                   ) : (
                     <>
                       <AlertTriangle className="mr-2 w-4 h-4" />
-                      View failed emails
+                      View failed {mode === "EMAIL" ? "emails" : "SMS messages"}
                     </>
                   )}
                 </Button>
@@ -504,7 +494,7 @@ export default function MessagesCenter() {
           <div className="px-5 py-4 border-b border-destructive/10 flex items-center justify-between">
             <p className="text-sm font-semibold text-destructive flex items-center gap-2">
               <AlertTriangle className="w-4 h-4" />
-              Failed email deliveries
+              Failed {mode === "EMAIL" ? "email" : "SMS"} deliveries
             </p>
             <span className="text-xs text-muted-foreground">Last 20 attempts</span>
           </div>
@@ -512,7 +502,7 @@ export default function MessagesCenter() {
             {failures.map((f) => (
               <div key={f.id} className="px-5 py-3 text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3">
                 <span className="font-medium text-foreground">{f.to ?? "—"}</span>
-                <span className="text-muted-foreground truncate flex-1">{f.subject ?? "—"}</span>
+                <span className="text-muted-foreground truncate flex-1">{f.subject ?? f.body ?? "—"}</span>
                 <span className="text-destructive text-xs font-medium">{f.error ?? "Unknown error"}</span>
               </div>
             ))}
@@ -592,6 +582,10 @@ export default function MessagesCenter() {
                 {mode === "EMAIL"
                   ? "Students without an email address are skipped automatically."
                   : "Students without a phone number are skipped automatically."}
+              </li>
+              <li className="flex gap-2">
+                <span className="text-primary font-bold shrink-0">·</span>
+                Students receive an automatic SMS after 2 consecutive absences.
               </li>
               {mode === "SMS" && (
                 <li className="flex gap-2">

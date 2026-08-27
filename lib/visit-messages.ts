@@ -15,10 +15,8 @@ export function buildVisitConfirmationMessage(args: { firstName: string; visitDa
   const name = args.firstName.trim() || "there"
 
   return (
-    `Hello ${name},\n\n` +
-    `Thank you for your interest in ${brand}. We have noted that you plan to visit us on ${dateLabel}.\n\n` +
-    `We look forward to welcoming you and sharing more about ${brand}.\n\n` +
-    `If you have any questions before your visit, feel free to reply to this message.`
+    `${brand}: Hello ${name}, your visit is scheduled for ${dateLabel}. ` +
+    `We look forward to welcoming you. Contact the institute if you need help.`
   )
 }
 
@@ -27,10 +25,8 @@ export function buildVisitDayReminderMessage(args: { firstName: string }) {
   const name = args.firstName.trim() || "there"
 
   return (
-    `Hello ${name},\n\n` +
-    `Today is the day you planned to visit ${brand}. We are ready to welcome you!\n\n` +
-    `Please come at your scheduled time. If you need directions or have questions, reply to this message.\n\n` +
-    `We look forward to seeing you today.`
+    `${brand}: Hello ${name}, this is a reminder that your planned visit is today. ` +
+    `We are ready to welcome you and look forward to seeing you.`
   )
 }
 

@@ -10,7 +10,7 @@ function groupAttendanceByDay(rows: Array<{ date: Date; status: string }>, now: 
   for (const row of rows) {
     const dayKey = row.date.toISOString().slice(0, 10)
     const existing = byDay.get(dayKey) ?? { present: 0, absent: 0 }
-    if (row.status === "PRESENT") existing.present++
+    if (row.status === "PRESENT" || row.status === "LATE") existing.present++
     if (row.status === "ABSENT") existing.absent++
     byDay.set(dayKey, existing)
   }
@@ -167,7 +167,7 @@ export async function getAdminSystemReport(input: { period?: string | null; mont
   for (const row of attendanceByClassRaw) {
     if (!row.classId) continue
     const entry = attendanceByClassMap.get(row.classId) ?? { present: 0, absent: 0 }
-    if (row.status === "PRESENT") entry.present += row._count._all
+    if (row.status === "PRESENT" || row.status === "LATE") entry.present += row._count._all
     if (row.status === "ABSENT") entry.absent += row._count._all
     attendanceByClassMap.set(row.classId, entry)
   }

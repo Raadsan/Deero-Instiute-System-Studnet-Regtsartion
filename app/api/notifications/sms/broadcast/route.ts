@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
-import { sendHormuudSms } from "@/lib/sms-hormuud"
+import { enqueueAndSendSms } from "@/lib/sms-queue"
 import { hasRoutePermission } from "@/lib/permissions"
 
 export async function POST(req: NextRequest) {
@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
 
     const students = await prisma.student.findMany({
       where: { classId: resolvedClassId, isActive: true, isHidden: false },
-      select: { phone: true, firstName: true },
+      select: { id: true, phone: true, firstName: true },
     })
 
     const results: Array<{ ok: boolean; status: "SENT" | "SKIPPED" | "FAILED"; error?: string }> = []
@@ -57,8 +57,18 @@ export async function POST(req: NextRequest) {
       const batchResults = await Promise.all(batch.map(async (s) => {
         if (!s.phone) return { ok: true as const, status: "SKIPPED" as const }
         const personalMessage = message.trim().replace(/\[\[name\]\]/g, s.firstName || "Student")
-        const result = await sendHormuudSms(s.phone, personalMessage)
-        if (result.ok) return { ok: true as const, status: "SENT" as const }
+        const result = await enqueueAndSendSms({
+          to: s.phone,
+          body: personalMessage,
+          meta: {
+            kind: "BROADCAST",
+            initiatedBy: session.userId,
+            classId: resolvedClassId!,
+            courseId: resolvedCourseId,
+            studentId: s.id,
+          },
+        })
+        if (result.ok) return { ok: true as const, status: result.status }
         return { ok: false as const, status: "FAILED" as const, error: result.error }
       }))
       results.push(...batchResults)

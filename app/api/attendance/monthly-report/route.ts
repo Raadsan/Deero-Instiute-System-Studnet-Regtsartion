@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { getSessionFromRequestCookies } from "@/lib/auth"
+import { calculateAttendancePercentage } from "@/lib/attendance-status"
 import { prisma } from "@/lib/prisma"
 import { formatInstituteDate, parseInstituteDay, parseInstituteMonth } from "@/lib/institute-date"
 
-function attendancePercentage(present: number, period: number) {
-  if (period <= 0) return null
-  const value = (present / period) * 100
-  return Math.min(100, Math.max(0, Math.round(value * 100) / 100))
-}
+type StatusCounts = { present: number; absent: number; late: number; excused: number; leave: number }
+
+const emptyStatusCounts = (): StatusCounts => ({ present: 0, absent: 0, late: 0, excused: 0, leave: 0 })
 
 export async function GET(req: NextRequest) {
   const session = await getSessionFromRequestCookies()
@@ -90,17 +89,20 @@ export async function GET(req: NextRequest) {
 
   const attendancePeriods = new Set(records.map((record) => formatInstituteDate(record.date))).size
 
-  const counts = new Map<string, { present: number; absent: number }>()
+  const counts = new Map<string, StatusCounts>()
   for (const record of records) {
-    const current = counts.get(record.studentId) ?? { present: 0, absent: 0 }
+    const current = counts.get(record.studentId) ?? emptyStatusCounts()
     if (record.status === "PRESENT") current.present++
     if (record.status === "ABSENT") current.absent++
+    if (record.status === "LATE") current.late++
+    if (record.status === "EXCUSED") current.excused++
+    if (record.status === "LEAVE") current.leave++
     counts.set(record.studentId, current)
   }
 
   const students = cls.students.map((student) => {
-    const count = counts.get(student.id) ?? { present: 0, absent: 0 }
-    const period = count.present + count.absent
+    const count = counts.get(student.id) ?? emptyStatusCounts()
+    const period = count.present + count.absent + count.late + count.excused + count.leave
     return {
       id: student.studentCode ?? "UNASSIGNED",
       studentCode: student.studentCode ?? "STU",
@@ -108,7 +110,10 @@ export async function GET(req: NextRequest) {
       period,
       present: count.present,
       absent: count.absent,
-      percentage: attendancePercentage(count.present, period),
+      late: count.late,
+      excused: count.excused,
+      leave: count.leave,
+      percentage: calculateAttendancePercentage(count.present, count.late, count.absent),
     }
   })
 
@@ -117,8 +122,11 @@ export async function GET(req: NextRequest) {
       period: sum.period + student.period,
       present: sum.present + student.present,
       absent: sum.absent + student.absent,
+      late: sum.late + student.late,
+      excused: sum.excused + student.excused,
+      leave: sum.leave + student.leave,
     }),
-    { period: 0, present: 0, absent: 0 },
+    { period: 0, present: 0, absent: 0, late: 0, excused: 0, leave: 0 },
   )
 
   return NextResponse.json({
@@ -131,7 +139,7 @@ export async function GET(req: NextRequest) {
     totals: {
       ...totals,
       periods: attendancePeriods,
-      percentage: attendancePercentage(totals.present, totals.period),
+      percentage: calculateAttendancePercentage(totals.present, totals.late, totals.absent),
     },
   })
 }

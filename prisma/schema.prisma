@@ -28,6 +28,9 @@ enum EnrollmentStatus {
 enum AttendanceStatus {
   PRESENT
   ABSENT
+  LATE
+  EXCUSED
+  LEAVE
 }
 
 enum CourseStatus {
@@ -380,6 +383,21 @@ model EmailMessage {
   to                String?
   subject           String
   text              String
+  meta              Json
+  status            MessageStatus
+  error             String?
+  providerMessageId String?
+  sentAt            DateTime?
+  createdAt         DateTime      @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
+
+model SmsMessage {
+  id                String        @id @default(cuid())
+  to                String?
+  body              String
   meta              Json
   status            MessageStatus
   error             String?

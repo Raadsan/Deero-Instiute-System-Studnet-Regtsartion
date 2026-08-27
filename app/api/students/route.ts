@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { canManageStudents, getSessionFromRequestCookies } from "@/lib/auth";
 import { parseStudentEnrollmentInput } from "@/lib/student-enrollment";
-import { sendVisitConfirmationWhatsApp } from "@/lib/visit-reminders";
+import { sendVisitConfirmationSms } from "@/lib/visit-reminders";
 import { buildPaginationMeta, parsePagination } from "@/lib/pagination";
 import { buildStudentSearchFilter } from "@/lib/student-search";
 import type { Prisma } from "@/lib/generated/prisma/client";
@@ -260,7 +260,7 @@ export async function POST(req: Request) {
 
   const phone = body.phone ?? null;
   if (enrollment.data.enrollmentStatus === "VISIT_SCHEDULED" && !phone?.trim()) {
-    return NextResponse.json({ message: "Phone number is required for visit scheduled students (WhatsApp)." }, { status: 400 });
+    return NextResponse.json({ message: "Phone number is required for visit reminder SMS messages." }, { status: 400 });
   }
 
   const inserted = await prisma.$transaction(async (tx) => {
@@ -309,24 +309,24 @@ export async function POST(req: Request) {
 
   const studentId = inserted.student.id;
 
-  let whatsappConfirmation: { status: string; error?: string } | null = null;
+  let smsConfirmation: { status: string; error?: string } | null = null;
   if (enrollment.data.enrollmentStatus === "VISIT_SCHEDULED" && enrollment.data.visitDate && phone?.trim()) {
     try {
-      const result = await sendVisitConfirmationWhatsApp({
+      const result = await sendVisitConfirmationSms({
         studentId,
         phone,
         firstName: body.firstName,
         visitDate: enrollment.data.visitDate,
         initiatedBy: session.userId,
       });
-      whatsappConfirmation = {
+      smsConfirmation = {
         status: result.status,
         error: "error" in result ? result.error : undefined,
       };
     } catch (e: unknown) {
-      whatsappConfirmation = {
+      smsConfirmation = {
         status: "FAILED",
-        error: e instanceof Error ? e.message : "WhatsApp not configured",
+        error: e instanceof Error ? e.message : "SMS is not configured",
       };
     }
   }
@@ -343,7 +343,7 @@ export async function POST(req: Request) {
       visitDate: enrollment.data.visitDate,
       visitNote: enrollment.data.visitNote,
       registeredById: session.userId,
-      whatsappConfirmation,
+      smsConfirmation,
     },
     { status: 201 },
   );

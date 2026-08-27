@@ -28,7 +28,7 @@ export const CONFIGURABLE_ROUTES: RouteConfig[] = [
   { path: "/payments", label: "Payments List", defaultRoles: ["ADMIN", "FINANCE"] },
   { path: "/audit", label: "System Audit Log", defaultRoles: ["ADMIN"] },
   { path: "/reports", label: "System Reports", defaultRoles: ["ADMIN"] },
-  { path: "/messages", label: "SMS/WhatsApp Messages", defaultRoles: ["ADMIN"] },
+  { path: "/messages", label: "SMS & Email Messages", defaultRoles: ["ADMIN"] },
   { path: "/permissions", label: "Role Permissions", defaultRoles: ["ADMIN"] },
 ]
 

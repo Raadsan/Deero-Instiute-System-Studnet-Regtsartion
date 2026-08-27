@@ -12,6 +12,10 @@ import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/hooks/use-toast"
 import { formatScheduleDays, getDefaultAttendanceDate, isDateInputOnSchedule, formatDateInputValue } from "@/lib/class-schedule"
+import {
+  ATTENDANCE_STATUS_OPTIONS,
+  type AttendanceStatus,
+} from "@/lib/attendance-status"
 
 type TeacherClass = {
   id: string
@@ -29,8 +33,6 @@ type StudentRow = {
   attendancePercentage?: number | null
 }
 
-type AttendanceStatus = "PRESENT" | "ABSENT"
-
 type MonthlyReport = {
   month: string
   class: { id: string; name: string; level: string | null }
@@ -43,9 +45,54 @@ type MonthlyReport = {
     period: number
     present: number
     absent: number
+    late: number
+    excused: number
+    leave: number
     percentage: number | null
   }>
-  totals: { period: number; present: number; absent: number; percentage: number | null }
+  totals: {
+    period: number
+    periods: number
+    present: number
+    absent: number
+    late: number
+    excused: number
+    leave: number
+    percentage: number | null
+  }
+}
+
+const STATUS_STYLE: Record<AttendanceStatus, { label: string; pill: string; dot: string; row: string }> = {
+  PRESENT: {
+    label: "Present",
+    pill: "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300",
+    dot: "bg-emerald-500",
+    row: "bg-emerald-50/70 hover:bg-emerald-50 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30",
+  },
+  ABSENT: {
+    label: "Absent",
+    pill: "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-800 dark:bg-rose-950/40 dark:text-rose-300",
+    dot: "bg-rose-500",
+    row: "hover:bg-muted/40",
+  },
+  LATE: {
+    label: "Late",
+    pill: "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300",
+    dot: "bg-amber-500",
+    row: "bg-amber-50/60 hover:bg-amber-50 dark:bg-amber-950/15 dark:hover:bg-amber-950/25",
+  },
+  EXCUSED: {
+    label: "Excused",
+    pill: "border-sky-200 bg-sky-50 text-sky-700 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300",
+    dot: "bg-sky-500",
+    row: "bg-sky-50/60 hover:bg-sky-50 dark:bg-sky-950/15 dark:hover:bg-sky-950/25",
+  },
+  LEAVE: {
+    label: "Leave",
+    pill: "border-violet-200 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300",
+    dot: "bg-violet-500",
+    row: "bg-violet-50/60 hover:bg-violet-50 dark:bg-violet-950/15 dark:hover:bg-violet-950/25",
+  },
 }
 
 function getErrorMessage(error: any) {
@@ -128,11 +175,19 @@ export default function TeacherAttendance() {
     const totalStudents = classes.reduce((sum, c) => sum + (c.studentsCount ?? 0), 0)
     const presentToday = students.filter((s) => (statusByStudentId[s.id] ?? "ABSENT") === "PRESENT").length
     const absentToday = students.filter((s) => (statusByStudentId[s.id] ?? "ABSENT") === "ABSENT").length
+    const lateToday = students.filter((s) => statusByStudentId[s.id] === "LATE").length
+    const excusedToday = students.filter((s) => statusByStudentId[s.id] === "EXCUSED").length
+    const leaveToday = students.filter((s) => statusByStudentId[s.id] === "LEAVE").length
     return {
       classCount: classes.length,
       totalStudents,
       presentToday,
       absentToday,
+      lateToday,
+      excusedToday,
+      leaveToday,
+      attendedToday: presentToday + lateToday,
+      awayToday: absentToday + excusedToday + leaveToday,
     }
   }, [classes, students, statusByStudentId])
 
@@ -189,14 +244,14 @@ export default function TeacherAttendance() {
     }))
   }
 
+  const setStudentAttendance = (studentId: string, status: AttendanceStatus) => {
+    setStatusByStudentId((current) => ({ ...current, [studentId]: status }))
+  }
+
   const filteredStudents = useMemo(() => {
     return students.filter((s) => {
-      const currentStatus = statusByStudentId[s.id] ?? "ABSENT" // Or actually, if we want to filter truly unmarked, wait, default is always ABSENT in UI? Actually in load it's either PRESENT or ABSENT.
-      const isUnmarked = statusByStudentId[s.id] === undefined
-      
-      // Status Filter
-      if (statusFilter === "PRESENT" && currentStatus !== "PRESENT") return false
-      if (statusFilter === "ABSENT" && currentStatus !== "ABSENT") return false
+      const currentStatus = statusByStudentId[s.id] ?? "ABSENT"
+      if (statusFilter !== "ALL" && currentStatus !== statusFilter) return false
       
       return true
     })
@@ -222,14 +277,20 @@ export default function TeacherAttendance() {
       return {
         studentId: s.id,
         status,
-        note: status === "ABSENT" ? noteByStudentId[s.id]?.trim() || undefined : undefined,
+        note: status !== "PRESENT" ? noteByStudentId[s.id]?.trim() || undefined : undefined,
       }
     })
 
     setSubmitting(true)
     try {
-      await api.post("/api/attendance", { date, classId: selectedClassId, items })
-      toast({ title: "Attendance saved" })
+      const response = await api.post<{
+        sms?: { sent: number; skipped: number; failed: number }
+      }>("/api/attendance", { date, classId: selectedClassId, items })
+      const sms = response.data.sms
+      const smsDescription = sms && (sms.sent || sms.skipped || sms.failed)
+        ? `${sms.sent} automatic SMS sent${sms.skipped ? ` · ${sms.skipped} skipped` : ""}${sms.failed ? ` · ${sms.failed} failed` : ""}.`
+        : undefined
+      toast({ title: "Attendance saved", description: smsDescription })
     } catch (e: any) {
       toast({ title: "Save failed", description: getErrorMessage(e), variant: "destructive" })
     } finally {
@@ -302,8 +363,11 @@ export default function TeacherAttendance() {
         <Card className="p-4 sm:p-5 border-muted/50 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Present Today</p>
-              <p className="text-2xl font-bold text-emerald-700 mt-1">{overview.presentToday}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Attended Today</p>
+              <p className="text-2xl font-bold text-emerald-700 mt-1">{overview.attendedToday}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {overview.presentToday} present · {overview.lateToday} late
+              </p>
             </div>
             <div className="p-2.5 rounded-xl bg-emerald-500/10 text-emerald-700">
               <CalendarCheck className="w-5 h-5" />
@@ -313,8 +377,11 @@ export default function TeacherAttendance() {
         <Card className="p-4 sm:p-5 border-muted/50 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Absent Today</p>
-              <p className="text-2xl font-bold text-amber-700 mt-1">{overview.absentToday}</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Away Today</p>
+              <p className="text-2xl font-bold text-amber-700 mt-1">{overview.awayToday}</p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {overview.absentToday} absent · {overview.excusedToday} excused · {overview.leaveToday} leave
+              </p>
             </div>
             <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-700">
               <CalendarX2 className="w-5 h-5" />
@@ -467,7 +534,7 @@ export default function TeacherAttendance() {
         <div className="space-y-1">
           <h2 className="text-xl font-bold text-foreground">Mark Attendance</h2>
           <p className="text-sm text-muted-foreground">
-            Tap a student row or its checkbox to mark them present. Add a reason only when absent.
+            Tap a row for quick Present/Absent marking. After 2 consecutive absences, the student receives an automatic SMS.
           </p>
         </div>
         <div className="hidden sm:block">
@@ -518,9 +585,10 @@ export default function TeacherAttendance() {
                    <SelectValue placeholder="All Statuses" />
                  </SelectTrigger>
                  <SelectContent>
-                   <SelectItem value="ALL">All Students</SelectItem>
-                   <SelectItem value="PRESENT">Present</SelectItem>
-                   <SelectItem value="ABSENT">Absent</SelectItem>
+                    <SelectItem value="ALL">All Students</SelectItem>
+                    {ATTENDANCE_STATUS_OPTIONS.map((option) => (
+                      <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                    ))}
                  </SelectContent>
                </Select>
              </div>
@@ -569,11 +637,7 @@ export default function TeacherAttendance() {
                     onClick={(event) => {
                       if (!isInteractiveTarget(event.target)) toggleStudentAttendance(s.id)
                     }}
-                    className={`relative cursor-pointer overflow-hidden rounded-xl border p-4 transition-colors space-y-3 ${
-                      status === "PRESENT"
-                        ? "border-emerald-300 bg-emerald-50/70 dark:border-emerald-800 dark:bg-emerald-950/25"
-                        : "border-border bg-muted/30 hover:bg-muted/50"
-                    }`}
+                    className={`relative cursor-pointer overflow-hidden rounded-xl border border-border p-4 transition-colors space-y-3 ${STATUS_STYLE[status].row}`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
@@ -585,12 +649,27 @@ export default function TeacherAttendance() {
                           </Badge>
                         </div>
                       </div>
-                      <Badge 
-                        variant={status === "PRESENT" ? "default" : "destructive"} 
-                        className="rounded-full px-3 py-0.5 text-[10px] h-fit font-bold"
+                      <Select
+                        value={status}
+                        onValueChange={(value) => setStudentAttendance(s.id, value as AttendanceStatus)}
                       >
-                        {status}
-                      </Badge>
+                        <SelectTrigger
+                          aria-label={`Attendance status for ${s.firstName} ${s.lastName}`}
+                          className={`h-8 w-[118px] rounded-full px-3 text-xs font-semibold shadow-none ${STATUS_STYLE[status].pill}`}
+                        >
+                          <SelectValue>{STATUS_STYLE[status].label}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ATTENDANCE_STATUS_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              <span className="flex items-center gap-2">
+                                <span className={`h-2 w-2 rounded-full ${STATUS_STYLE[option.value].dot}`} />
+                                {option.label}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     <label
@@ -603,20 +682,15 @@ export default function TeacherAttendance() {
                       <input
                         type="checkbox"
                         checked={status === "PRESENT"}
-                        onChange={(event) =>
-                          setStatusByStudentId((cur) => ({
-                            ...cur,
-                            [s.id]: event.target.checked ? "PRESENT" : "ABSENT",
-                          }))
-                        }
+                        onChange={(event) => setStudentAttendance(s.id, event.target.checked ? "PRESENT" : "ABSENT")}
                         aria-label={`Mark ${s.firstName} ${s.lastName} present`}
                         className="h-5 w-5 rounded accent-emerald-600"
                       />
                     </label>
-                    {status === "ABSENT" && (
+                    {status !== "PRESENT" && (
                       <div className="space-y-1.5">
                         <label htmlFor={`mobile-excuse-${s.id}`} className="text-xs font-semibold text-foreground">
-                          Excuse / reason for absence
+                          Note / reason for {STATUS_STYLE[status].label.toLowerCase()}
                         </label>
                         <Textarea
                           id={`mobile-excuse-${s.id}`}
@@ -626,7 +700,7 @@ export default function TeacherAttendance() {
                           }
                           maxLength={500}
                           rows={2}
-                          placeholder="Write the student's excuse or reason..."
+                          placeholder="Optional note or reason..."
                           className="min-h-20 resize-y bg-background"
                         />
                       </div>
@@ -661,11 +735,7 @@ export default function TeacherAttendance() {
                         onClick={(event) => {
                           if (!isInteractiveTarget(event.target)) toggleStudentAttendance(s.id)
                         }}
-                        className={`cursor-pointer border-b transition-colors ${
-                          status === "PRESENT"
-                            ? "bg-emerald-50/70 hover:bg-emerald-50 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/30"
-                            : "hover:bg-muted/40"
-                        }`}
+                        className={`cursor-pointer border-b transition-colors ${STATUS_STYLE[status].row}`}
                       >
                         <TableCell className="pl-6 py-4 font-mono text-xs text-muted-foreground">{index + 1}</TableCell>
                         <TableCell className="py-4 font-bold text-foreground font-medium">
@@ -679,15 +749,30 @@ export default function TeacherAttendance() {
                           </div>
                         </TableCell>
                         <TableCell className="py-4">
-                          <Badge 
-                            variant={status === "PRESENT" ? "default" : "secondary"}
-                            className={status === "ABSENT" ? "bg-rose-100 text-rose-700 hover:bg-rose-100 border-rose-200" : ""}
+                          <Select
+                            value={status}
+                            onValueChange={(value) => setStudentAttendance(s.id, value as AttendanceStatus)}
                           >
-                            {status}
-                          </Badge>
+                            <SelectTrigger
+                              aria-label={`Attendance status for ${s.firstName} ${s.lastName}`}
+                              className={`h-9 w-[118px] rounded-full px-3 text-xs font-semibold shadow-none ${STATUS_STYLE[status].pill}`}
+                            >
+                              <SelectValue>{STATUS_STYLE[status].label}</SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {ATTENDANCE_STATUS_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  <span className="flex items-center gap-2">
+                                    <span className={`h-2 w-2 rounded-full ${STATUS_STYLE[option.value].dot}`} />
+                                    {option.label}
+                                  </span>
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell className="py-3">
-                          {status === "ABSENT" ? (
+                          {status !== "PRESENT" ? (
                             <Textarea
                               value={noteByStudentId[s.id] ?? ""}
                               onChange={(event) =>
@@ -695,12 +780,12 @@ export default function TeacherAttendance() {
                               }
                               maxLength={500}
                               rows={2}
-                              aria-label={`Excuse or reason for ${s.firstName} ${s.lastName}`}
-                              placeholder="Write an excuse or reason..."
+                              aria-label={`Note or reason for ${s.firstName} ${s.lastName}`}
+                              placeholder={`Optional note for ${STATUS_STYLE[status].label.toLowerCase()}...`}
                               className="min-h-16 resize-y bg-background"
                             />
                           ) : (
-                            <span className="text-xs text-muted-foreground">Available when absent</span>
+                            <span className="text-xs text-muted-foreground">No note needed when present</span>
                           )}
                         </TableCell>
                         <TableCell className="py-4 text-right pr-6">
@@ -714,12 +799,7 @@ export default function TeacherAttendance() {
                             <input
                               type="checkbox"
                               checked={status === "PRESENT"}
-                              onChange={(event) =>
-                                setStatusByStudentId((cur) => ({
-                                  ...cur,
-                                  [s.id]: event.target.checked ? "PRESENT" : "ABSENT",
-                                }))
-                              }
+                              onChange={(event) => setStudentAttendance(s.id, event.target.checked ? "PRESENT" : "ABSENT")}
                               aria-label={`Mark ${s.firstName} ${s.lastName} present`}
                               className="h-5 w-5 rounded accent-emerald-600"
                             />

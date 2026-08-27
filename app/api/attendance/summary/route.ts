@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getSessionFromRequestCookies } from "@/lib/auth"
+import { calculateAttendancePercentage } from "@/lib/attendance-status"
 import { formatInstituteDate, parseInstituteDay } from "@/lib/institute-date"
 
 export async function GET(req: NextRequest) {
@@ -37,19 +38,33 @@ export async function GET(req: NextRequest) {
 
   const groupedMap = new Map<
     string,
-    { presentCount: number; absentCount: number; total: number; teacherIds: Set<string> }
+    {
+      presentCount: number
+      absentCount: number
+      lateCount: number
+      excusedCount: number
+      leaveCount: number
+      total: number
+      teacherIds: Set<string>
+    }
   >()
 
   for (const r of records) {
     const entry = groupedMap.get(r.classId) ?? {
       presentCount: 0,
       absentCount: 0,
+      lateCount: 0,
+      excusedCount: 0,
+      leaveCount: 0,
       total: 0,
       teacherIds: new Set<string>(),
     }
     entry.total++
     if (r.status === "PRESENT") entry.presentCount++
     if (r.status === "ABSENT") entry.absentCount++
+    if (r.status === "LATE") entry.lateCount++
+    if (r.status === "EXCUSED") entry.excusedCount++
+    if (r.status === "LEAVE") entry.leaveCount++
     if (r.teacherId) entry.teacherIds.add(r.teacherId)
     groupedMap.set(r.classId, entry)
   }
@@ -58,6 +73,9 @@ export async function GET(req: NextRequest) {
     const g = groupedMap.get(cls.id) ?? {
       presentCount: 0,
       absentCount: 0,
+      lateCount: 0,
+      excusedCount: 0,
+      leaveCount: 0,
       total: 0,
       teacherIds: new Set<string>(),
     }
@@ -65,11 +83,14 @@ export async function GET(req: NextRequest) {
     const total = cls.students.length
     const presentCount = g.presentCount
     const absentCount = g.absentCount
-    const percentage = markedTotal ? Math.round((presentCount / markedTotal) * 100) : 0
+    const percentage = calculateAttendancePercentage(presentCount, g.lateCount, absentCount) ?? 0
     return {
       class: { id: cls.id, name: cls.name, level: cls.level },
       presentCount,
       absentCount,
+      lateCount: g.lateCount,
+      excusedCount: g.excusedCount,
+      leaveCount: g.leaveCount,
       total,
       unmarkedCount: Math.max(0, total - markedTotal),
       percentage,
